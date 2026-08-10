@@ -227,6 +227,30 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
 - Offline pill is intentionally kept on both platforms — it is the live progress/"offline ready"
   indicator the user asked for. On ≤400px screens its label truncates to avoid crowding the header.
 
+## 8. Install-button + single-track player fixes (deployed 2026-08-10)
+
+- **Install button hidden on iOS**: added `button[hidden] { display: none !important; }` so the
+  `hidden` attribute always wins over `.btn` display. Verified in a browser with an iPhone UA —
+  the Install button stays hidden (`#installBtn.hidden === true`). The only place it can appear is
+  Android/Chrome where a real `beforeinstallprompt` fires.
+- **Single-track player exclusivity**: `audio.ts` now emits a `null` state whenever switching sources
+  or pausing, so every play button re-syncs — exactly one row can be in the animated "playing" state
+  at a time. Verified: click track A (playing), click track B → B playing, A no longer animating,
+  `playingCount === 1`.
+- Both verified in a headless browser with zero console errors; smoke test **23/23**. Deployed to
+  GitHub Pages (bundle `index-CPxqiZBh.js`). On a device, reload the app once (the updated SW v1.5.0
+  serves the new assets).
+
+## 9. Updating set times / the timetable (data refresh)
+
+- Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
+  Clashfinder). They are NOT fetched live by the PWA.
+- **To update when we're closer to the date**: edit the timetable source, re-run
+  `npm run scrape` (or `npm run clips`), then `npm run build` + deploy to gh-pages. Do this on the
+  computer (the repo), not inside the PWA.
+- Users don't need to reinstall — the service worker picks up the new data on next load (cache
+  version bumps to force it). On-device: open the app → it updates automatically in the background.
+
 ## 8. Player exclusivity + Install button bug (2026-08-10)
 
 - **Install button truly hidden**: `.btn { display: inline-flex }` was overriding the `hidden`
