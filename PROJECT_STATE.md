@@ -195,3 +195,21 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   offline playback of all 30 music previews, zero console errors).
 - Final audio inventory: **684 tracks** — 655 music + 29 film trailers — every one with a bundled
   offline clip, manifest and disk fully consistent (684/684, no stale/dangling).
+
+## 6. Offline UX + audio visualiser (2026-08-10)
+
+- **Offline progress pill** in the header (`app/src/offline.ts` + `main.ts`): shows real status —
+  "Get offline audio" → "Offline X% · Y MB" → "Offline ready ✓" (or partial/error with tap-to-retry).
+  Tapping downloads all 684 bundled clips (~114 MB) into a dedicated `eotr2026-clips` cache with a
+  visible progress fill. The app is only truly offline once this shows "Offline ready".
+- **Service worker change** (`app/public/sw.js`): the old `install` step tried to precache all 114 MB
+  of audio, which silently stalled activation on phones. Clips are no longer precached at install —
+  they are fetched on demand and cached, and the visible offline download fills the same clips cache.
+  SW bumped to `eotr2026-v1.5.0`.
+- **Audio visualiser redesign** (`app/src/views/artist.ts` + CSS): the animated 5-bar equalizer now
+  renders inside the play button while playing (no more bars squashed under the button). Each track
+  row now shows a live playhead progress bar + elapsed/total time (`m:ss`).
+- **iOS install hint**: on iPhone/iPad, the in-app Install button is dead (iOS has no install prompt),
+  so the app now shows a one-time toast — "iPhone? Tap Share → Add to Home Screen to install."
+- Verified via browser: pill renders, taps into downloading state with live %/MB, zero console errors.
+  Smoke test still passes **23/23**.

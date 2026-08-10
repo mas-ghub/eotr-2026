@@ -2,9 +2,13 @@
  * Bump CACHE_VERSION whenever the app or the festival data changes so clients
  * download fresh copies.
  */
-const CACHE_VERSION = 'eotr2026-v1.4.0';
+const CACHE_VERSION = 'eotr2026-v1.5.0';
 const APP_CACHE = `app-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
+// The page downloads all clips into this cache with progress UI, so offline
+// works once the visible download has finished. Do NOT precache clips here in
+// install — 114 MB of audio in install stalls activation and fails silently.
+const CLIPS_CACHE = 'eotr2026-clips';
 
 const PRECACHE = [
   './',
@@ -33,16 +37,6 @@ self.addEventListener('install', (event) => {
     (async () => {
       const cache = await caches.open(APP_CACHE);
       await cache.addAll(PRECACHE);
-      // Precache bundled offline audio clips listed in the generated manifest.
-      try {
-        const res = await fetch('./data/previews-manifest.json');
-        if (res.ok) {
-          const files = await res.json();
-          await Promise.allSettled(files.map((f) => cache.add(f)));
-        }
-      } catch {
-        /* manifest missing is fine */
-      }
       await self.skipWaiting();
     })()
   );
@@ -99,6 +93,18 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
+    // Bundled preview clips may live in the page's offline cache.
+    if (/\.mp3$/i.test(url.pathname)) {
+      event.respondWith(
+        (async () => {
+          const clips = await caches.open(CLIPS_CACHE);
+          const hit = await clips.match(request);
+          if (hit) return hit;
+          return cacheFirst(request);
+        })()
+      );
+      return;
+    }
     event.respondWith(cacheFirst(request));
     return;
   }

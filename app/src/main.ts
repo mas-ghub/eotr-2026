@@ -4,6 +4,7 @@ import { currentRoute, onRoute, type Route } from './router';
 import { runViewCleanup } from './lifecycle';
 import { schedule } from './store';
 import { player } from './audio';
+import { offline, fmtBytes, type OfflineStatus } from './offline';
 import { h, icon, toast } from './ui';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
@@ -43,12 +44,68 @@ interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
 }
 
+const isIOS =
+  /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const isStandalone = (() => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+})();
+
+/** Small header pill that shows the real offline-download state. */
+function buildOfflinePill(): HTMLElement {
+  const fill = h('i', { class: 'offline-pill__fill' });
+  const label = h('span', { class: 'offline-pill__label' });
+  const pill = h('button', { class: 'offline-pill idle', type: 'button', html: `${icon('download', 13)}`, 'aria-label': 'Offline audio status' });
+  pill.appendChild(label);
+  pill.appendChild(fill);
+
+  const render = (s: OfflineStatus) => {
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    fill.style.width = s.state === 'ready' ? '100%' : `${Math.min(100, pct)}%`;
+    pill.title = s.error || '';
+    pill.classList.remove('idle', 'downloading', 'ready', 'partial', 'error');
+    pill.classList.add(s.state);
+    if (s.state === 'ready') {
+      pill.classList.add('ready');
+      pill.innerHTML = `${icon('check', 13)}`;
+      pill.appendChild(label);
+      label.textContent = 'Offline ready';
+    } else if (s.state === 'downloading') {
+      label.textContent = `Offline ${pct}% · ${fmtBytes(s.bytes)}`;
+    } else if (s.state === 'partial') {
+      label.textContent = `Offline ${pct}% · tap to retry`;
+    } else if (s.state === 'error') {
+      label.textContent = 'Offline failed · tap to retry';
+    } else {
+      label.textContent = s.done > 0 ? `Get offline audio · ${pct}%` : 'Get offline audio';
+    }
+  };
+  offline.subscribe(render);
+
+  pill.addEventListener('click', () => {
+    if (offline.status.state !== 'downloading') void offline.start();
+  });
+  return pill;
+}
+
+/** One-time hint for iOS Safari, where there is no install prompt. */
+function maybeIosHint() {
+  if (!isIOS || isStandalone) return;
+  if (localStorage.getItem('eotr-ios-hint')) return;
+  localStorage.setItem('eotr-ios-hint', '1');
+  setTimeout(() => {
+    toast('iPhone? Tap Share → "Add to Home Screen" to install this app.', { type: 'info', ms: 6000 });
+  }, 1800);
+}
+
 function buildShell(updated: string) {
   const header = h(
     'header',
     { class: 'app-header' },
     h('a', { class: 'brand', href: '#/lineup' }, h('span', { class: 'brand__mark' }, 'EOTR'), h('span', { class: 'brand__year' }, '2026')),
-    h('p', { class: 'app-header__meta' }, `Updated ${updated}`),
+    buildOfflinePill(),
     h('button', { id: 'installBtn', class: 'btn btn-ghost small install-btn', type: 'button', hidden: true, html: `${icon('download', 14)} Install` })
   );
 
@@ -56,7 +113,7 @@ function buildShell(updated: string) {
   const footer = h(
     'footer',
     { class: 'app-footer' },
-    h('p', {}, 'An unofficial fan guide. Set times from Clashfinder; artists from the official End of the Road site.'),
+    h('p', {}, `Updated ${updated} · unofficial fan guide. Set times from Clashfinder; artists from the official End of the Road site.`),
     h('p', {}, 'Preview clips are 30-second excerpts for discovery purposes.')
   );
 
@@ -148,6 +205,8 @@ async function renderRoute(route: Route) {
 async function boot() {
   registerServiceWorker();
   installPrompt();
+  maybeIosHint();
+  void offline.init();
 
   try {
     const data = await loadData();

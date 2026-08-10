@@ -46,6 +46,25 @@ class Player {
     return !this.audio.paused && !this.audio.ended && this.current === url;
   }
 
+  /** Current playhead for a url (0/0 when not playing). */
+  progress(url: string): { current: number; duration: number } {
+    if (!this.isPlaying(url)) return { current: 0, duration: 0 };
+    return { current: this.audio.currentTime || 0, duration: this.audio.duration || 0 };
+  }
+
+  /** Subscribe to playback clock ticks (timeupdate / ended / play). */
+  subscribeTick(fn: () => void): () => void {
+    const h = () => fn();
+    this.audio.addEventListener('timeupdate', h);
+    this.audio.addEventListener('ended', h);
+    this.audio.addEventListener('play', h);
+    return () => {
+      this.audio.removeEventListener('timeupdate', h);
+      this.audio.removeEventListener('ended', h);
+      this.audio.removeEventListener('play', h);
+    };
+  }
+
   async toggle(track: TrackRef): Promise<void> {
     const url = track.local || track.url;
     if (this.isPlaying(url)) {

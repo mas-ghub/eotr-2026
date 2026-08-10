@@ -17,7 +17,14 @@ const LINK_ICONS: Record<string, string> = {
 };
 
 function eq(): string {
-  return '<span class="eq"><i></i><i></i><i></i></span>';
+  return '<span class="eq"><i></i><i></i><i></i><i></i><i></i></span>';
+}
+
+function fmtTime(sec: number): string {
+  if (!sec || !isFinite(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function trackRow(artist: Artist, track: PreviewTrack): HTMLElement {
@@ -31,22 +38,42 @@ function trackRow(artist: Artist, track: PreviewTrack): HTMLElement {
     h('span', { class: 'track-play__eq', html: eq() })
   );
 
+  const progressBar = h('span', { class: 'track-progress' });
+  const timeEl = h('span', { class: 'track-time' }, '0:00');
+
   const update = () => {
     const playing = player.isPlaying(src);
     btn.classList.toggle('playing', playing);
-    btn.innerHTML = playing ? icon('pause', 20) : icon('play', 20);
-    if (playing) btn.appendChild(h('span', { class: 'track-play__eq', html: eq() }));
+    btn.innerHTML = playing ? eq() : icon('play', 20);
+    progressBar.classList.toggle('visible', playing);
+    if (!playing) {
+      progressBar.style.width = '0%';
+      timeEl.textContent = '0:00';
+    }
+  };
+
+  const tick = () => {
+    const { current, duration } = player.progress(src);
+    if (!player.isPlaying(src)) return;
+    progressBar.classList.add('visible');
+    const pct = duration ? Math.min(100, (current / duration) * 100) : 0;
+    progressBar.style.width = `${pct}%`;
+    timeEl.textContent = `${fmtTime(current)} / ${fmtTime(duration)}`;
   };
 
   btn.addEventListener('click', async () => {
     try {
       await player.toggle({ url: track.url, local: track.local });
       update();
+      tick();
     } catch (err) {
       toast((err as Error).message, { type: 'error' });
     }
   });
   const unsub = player.subscribe(update);
+  const unsubTick = player.subscribeTick(tick);
+  onViewCleanup(unsub);
+  onViewCleanup(unsubTick);
 
   const clipBtn = h(
     'button',
@@ -69,8 +96,9 @@ function trackRow(artist: Artist, track: PreviewTrack): HTMLElement {
       h('p', { class: 'track-meta__album' }, track.album || 'Preview')
     )
   );
+  row.appendChild(timeEl);
   row.appendChild(clipBtn);
-  onViewCleanup(unsub);
+  row.appendChild(progressBar);
   return row;
 }
 
