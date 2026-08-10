@@ -270,6 +270,9 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   node ("<svg viewBox=…>…clashes with another set"). Fixed by passing it via the `html:` prop so it
   renders as a real SVG element. Verified: clash tag innerHTML is a real `<svg>` with zero literal
   `<svg` text; full scan of all `icon()` call sites confirmed this was the only occurrence.
+- **Timetable hour labels**: `timetable.ts` computed labels with `hh % 24` where `hh` is in minutes,
+  producing alternating `12:00`/`00:00`. Fixed to `Math.floor(hh / 60) % 24`. Labels now render
+  correctly 09:00→02:00 across the festival day (including the post-midnight hours).
 
 ## 9. Updating set times / the timetable (data refresh)
 

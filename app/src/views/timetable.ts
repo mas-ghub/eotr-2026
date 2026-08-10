@@ -115,12 +115,12 @@ export async function renderTimetable(): Promise<HTMLElement> {
       style: { height: `${stages.length * ROW_H}px` }
     });
 
-    // hour markers
+    // hour markers (hh is in MINUTES; the label is the hour of day)
     for (let hh = RANGE_START; hh < RANGE_END; hh += 60) {
       const left = ((hh - RANGE_START) / (RANGE_END - RANGE_START)) * 100;
       board.appendChild(h('div', { class: 'tt-hour', style: { left: `${left}%` } }));
       board.appendChild(
-        h('div', { class: 'tt-hour-label', style: { left: `${left}%` } }, `${String((hh % 24)).padStart(2, '0')}:00`)
+        h('div', { class: 'tt-hour-label', style: { left: `${left}%` } }, `${String(Math.floor(hh / 60) % 24).padStart(2, '0')}:00`)
       );
     }
 
