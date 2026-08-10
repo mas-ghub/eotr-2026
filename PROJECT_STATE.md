@@ -226,3 +226,14 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   knows what is happening and how to remove/reinstall.
 - Offline pill is intentionally kept on both platforms — it is the live progress/"offline ready"
   indicator the user asked for. On ≤400px screens its label truncates to avoid crowding the header.
+
+## 8. Player exclusivity + Install button bug (2026-08-10)
+
+- **Install button truly hidden**: `.btn { display: inline-flex }` was overriding the `hidden`
+  attribute, so the Install button stayed visible on iPhone even though JS never shows it.
+  Added `.btn[hidden], button[hidden] { display: none !important }`. Verified `display:none`.
+- **Only one track animates**: the player's `notify()` only fired on pause/ended/error and never
+  when playback *started*, so the previously-playing button could stay stuck in the animated state.
+  Rewrote `Player` to always `emit()` the current url on `playing`/`pause`/`ended`/`error` and to
+  announce the old url as null *before* swapping sources. Verified: start track 1 → 1 row playing;
+  switch to track 2 → exactly 1 row + 1 progress bar; stop → 0.

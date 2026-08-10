@@ -24,9 +24,10 @@ class Player {
   constructor() {
     this.audio = new Audio();
     this.audio.preload = 'none';
-    this.audio.addEventListener('pause', () => this.notify());
-    this.audio.addEventListener('ended', () => this.notify());
-    this.audio.addEventListener('error', () => this.notify());
+    this.audio.addEventListener('playing', () => this.emit());
+    this.audio.addEventListener('pause', () => this.emit());
+    this.audio.addEventListener('ended', () => this.emit());
+    this.audio.addEventListener('error', () => this.emit());
   }
 
   subscribe(fn: StateListener): () => void {
@@ -34,12 +35,12 @@ class Player {
     return () => this.listeners.delete(fn);
   }
 
-  private notify() {
-    const url = !this.audio.paused && !this.audio.ended && this.current ? this.current : null;
-    if (url !== this.current || url === null) {
-      this.current = url;
-      this.listeners.forEach((fn) => fn(url));
-    }
+  /** Always emit the current state so every button re-syncs (only one can be playing). */
+  private emit() {
+    const playing = !this.audio.paused && !this.audio.ended && this.current !== null;
+    const url = playing ? this.current : null;
+    this.current = url;
+    this.listeners.forEach((fn) => fn(url));
   }
 
   isPlaying(url: string): boolean {
@@ -69,6 +70,7 @@ class Player {
     const url = track.local || track.url;
     if (this.isPlaying(url)) {
       this.audio.pause();
+      this.emit();
       return;
     }
     await this.play(url);
@@ -76,9 +78,17 @@ class Player {
 
   async play(url: string): Promise<void> {
     try {
-      if (this.audio.src !== url) this.audio.src = url;
+      if (this.audio.src !== url) {
+        // Switching sources fires 'pause' on the old element; announce it first
+        // so the previously-playing row stops animating immediately.
+        const prev = this.current;
+        this.current = null;
+        if (prev) this.listeners.forEach((fn) => fn(null));
+        this.audio.src = url;
+      }
       this.current = url;
       await this.audio.play();
+      this.emit();
     } catch {
       this.current = null;
       this.listeners.forEach((fn) => fn(null));

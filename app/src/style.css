@@ -333,6 +333,13 @@ button {
   transition: transform 0.12s, box-shadow 0.2s, background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
 }
 
+/* The `hidden` attribute must win over `.btn`'s display so controls like the
+   install button can be truly hidden (e.g. never shown on iOS). */
+.btn[hidden],
+button[hidden] {
+  display: none !important;
+}
+
 .btn:active {
   transform: scale(0.97);
 }
