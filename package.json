@@ -1,0 +1,14 @@
+{
+  "name": "eotr-2026-pwa",
+  "private": true,
+  "version": "1.0.0",
+  "description": "End of the Road 2026 festival PWA - lineup, timetable, personal schedule and audio previews",
+  "scripts": {
+    "scrape": "npm --prefix scraper run scrape",
+    "clips": "npm --prefix scraper run clips",
+    "icons": "npm --prefix app run icons",
+    "dev": "npm --prefix app run dev",
+    "build": "npm --prefix app run build",
+    "preview": "npm --prefix app run preview"
+  }
+}

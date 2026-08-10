@@ -1,0 +1,14 @@
+{
+  "name": "eotr-scraper",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Build-time scraper: clashfinder set times, EOTR artist pages, iTunes previews",
+  "scripts": {
+    "scrape": "node src/build.mjs",
+    "clips": "node src/cli.mjs"
+  },
+  "dependencies": {
+    "node-html-parser": "^9.0.1"
+  }
+}

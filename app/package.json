@@ -1,0 +1,17 @@
+{
+  "name": "eotr-2026-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "End of the Road 2026 PWA",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.2.1"
+  }
+}
