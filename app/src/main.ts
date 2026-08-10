@@ -5,7 +5,7 @@ import { runViewCleanup } from './lifecycle';
 import { schedule } from './store';
 import { player } from './audio';
 import { offline, fmtBytes, type OfflineStatus } from './offline';
-import { h, icon, toast } from './ui';
+import { h, icon, toast, sheet } from './ui';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
 import { renderSchedule } from './views/schedule';
@@ -27,6 +27,8 @@ function registerServiceWorker() {
 function installPrompt() {
   let deferred: Event | null = null;
   window.addEventListener('beforeinstallprompt', (e) => {
+    // iOS Safari has no install prompt, and a standalone app is already installed.
+    if (isIOS || isStandalone) return;
     e.preventDefault();
     deferred = e;
     const btn = document.getElementById('installBtn') as HTMLButtonElement | null;
@@ -100,12 +102,46 @@ function maybeIosHint() {
   }, 1800);
 }
 
+/** Help sheet: install/uninstall/offline so the user always knows what is going on. */
+function openHelp() {
+  const body = h('div', { class: 'help-body' });
+  const sec = (title: string, lines: string[]) => {
+    const s = h('section', { class: 'help-sec' }, h('h4', {}, title));
+    for (const ln of lines) s.appendChild(h('p', {}, ln));
+    return s;
+  };
+  body.appendChild(
+    sec('Install', [
+      'iPhone/iPad (Safari): tap the Share button (square with up arrow), then "Add to Home Screen", then Add.',
+      'Android (Chrome): tap the "Install app" prompt, or the ⋮ menu → "Install app".'
+    ])
+  );
+  body.appendChild(
+    sec('Uninstall & reinstall', [
+      'iPhone/iPad: press and hold the EOTR 2026 icon on the home screen → Remove App / Delete App. Reinstall with the steps above.',
+      'Android: press and hold the icon → Uninstall / Remove. Reinstall from the same link.'
+    ])
+  );
+  body.appendChild(
+    sec('Offline audio', [
+      'Tap the pill at the top ("Get offline audio") to download every preview clip. It fills up as it downloads and turns green "Offline ready" when done.',
+      'Once it says "Offline ready", everything (lineup, timetable, all previews) works with no signal.',
+      'Each device downloads its own copy — do it once per phone/tablet on Wi-Fi.'
+    ])
+  );
+  sheet({ title: 'EOTR 2026 · help', body });
+}
+
 function buildShell(updated: string) {
+  const helpBtn = h('button', { class: 'header-help', type: 'button', 'aria-label': 'Help', title: 'Help: install, uninstall, offline audio', html: icon('help', 18) });
+  helpBtn.addEventListener('click', openHelp);
+
   const header = h(
     'header',
     { class: 'app-header' },
     h('a', { class: 'brand', href: '#/lineup' }, h('span', { class: 'brand__mark' }, 'EOTR'), h('span', { class: 'brand__year' }, '2026')),
     buildOfflinePill(),
+    helpBtn,
     h('button', { id: 'installBtn', class: 'btn btn-ghost small install-btn', type: 'button', hidden: true, html: `${icon('download', 14)} Install` })
   );
 

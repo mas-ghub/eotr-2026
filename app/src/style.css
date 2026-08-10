@@ -75,9 +75,13 @@ button {
   z-index: 30;
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: var(--header-h);
-  padding: 0 16px;
+  gap: 10px;
+  /* Push content below the iOS notch / status bar when installed fullscreen. */
+  height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: 0;
+  padding-left: 16px;
+  padding-right: 16px;
   background: rgba(246, 241, 231, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -183,6 +187,59 @@ button {
 .offline-pill.error {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.header-help {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+.header-help:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.06);
+}
+
+@media (max-width: 400px) {
+  .offline-pill__label {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.help-sec h4 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.help-sec p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.help-sec p:last-child {
+  margin-bottom: 0;
 }
 
 .app-nav {

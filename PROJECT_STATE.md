@@ -213,3 +213,16 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   so the app now shows a one-time toast — "iPhone? Tap Share → Add to Home Screen to install."
 - Verified via browser: pill renders, taps into downloading state with live %/MB, zero console errors.
   Smoke test still passes **23/23**.
+
+## 7. iOS header fix + help (2026-08-10)
+
+- **Notch fix**: `.app-header` now uses `height: calc(var(--header-h) + env(safe-area-inset-top))`
+  + `padding-top: env(safe-area-inset-top)` so installed fullscreen on iPhone/iPad the header
+  sits below the camera notch/status bar instead of being squashed under it.
+- **Install button**: only ever shown when a real `beforeinstallprompt` fires (Android/Chrome).
+  Explicitly guarded so it can never appear on iOS or when already standalone.
+- **Help sheet** (`?` button in header, via existing `sheet()`): explains install, uninstall/reinstall
+  (iOS: hold icon → Remove App; Android: hold → Uninstall), and offline audio — so the user always
+  knows what is happening and how to remove/reinstall.
+- Offline pill is intentionally kept on both platforms — it is the live progress/"offline ready"
+  indicator the user asked for. On ≤400px screens its label truncates to avoid crowding the header.
