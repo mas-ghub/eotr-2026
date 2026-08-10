@@ -88,6 +88,11 @@ class OfflineManager {
   /** Download any clips that are not cached yet, with progress. */
   async start(): Promise<void> {
     if (this.running) return;
+    // Never attempt a download with no connection — it can only fail.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.set({ state: 'error', error: 'You are offline. Reconnect and tap again to download previews.' });
+      return;
+    }
     this.running = true;
     try {
       const manifest = await loadManifest();

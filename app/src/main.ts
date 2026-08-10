@@ -63,18 +63,36 @@ function buildOfflinePill(): HTMLElement {
   pill.appendChild(label);
   pill.appendChild(fill);
 
+  let isOnline = navigator.onLine;
+  window.addEventListener('online', () => { isOnline = true; render(offline.status); });
+  window.addEventListener('offline', () => { isOnline = false; render(offline.status); });
+
   const render = (s: OfflineStatus) => {
-    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-    fill.style.width = s.state === 'ready' ? '100%' : `${Math.min(100, pct)}%`;
-    pill.title = s.error || '';
-    pill.classList.remove('idle', 'downloading', 'ready', 'partial', 'error');
-    pill.classList.add(s.state);
+    pill.classList.remove('idle', 'downloading', 'ready', 'partial', 'error', 'offline');
     if (s.state === 'ready') {
+      // Offline-ready is reassuring even when disconnected, so show it first.
       pill.classList.add('ready');
+      fill.style.width = '100%';
+      pill.title = 'All previews downloaded — works with no signal.';
       pill.innerHTML = `${icon('check', 13)}`;
       pill.appendChild(label);
       label.textContent = 'Offline ready';
-    } else if (s.state === 'downloading') {
+      return;
+    }
+    if (!isOnline) {
+      pill.classList.add('offline');
+      fill.style.width = '0%';
+      pill.title = 'No connection. Everything you already downloaded still works.';
+      pill.innerHTML = `${icon('wifiOff', 13)}`;
+      pill.appendChild(label);
+      label.textContent = 'Offline mode';
+      return;
+    }
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    fill.style.width = `${Math.min(100, pct)}%`;
+    pill.title = s.error || '';
+    pill.classList.add(s.state);
+    if (s.state === 'downloading') {
       label.textContent = `Offline ${pct}% · ${fmtBytes(s.bytes)}`;
     } else if (s.state === 'partial') {
       label.textContent = `Offline ${pct}% · tap to retry`;
@@ -87,6 +105,7 @@ function buildOfflinePill(): HTMLElement {
   offline.subscribe(render);
 
   pill.addEventListener('click', () => {
+    if (!isOnline) return;
     if (offline.status.state !== 'downloading') void offline.start();
   });
   return pill;

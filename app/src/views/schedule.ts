@@ -82,7 +82,7 @@ export async function renderSchedule(): Promise<HTMLElement> {
             'div',
             { class: 'myday-row__info' },
             h('p', { class: 'myday-row__name' }, act.name),
-            h('p', { class: 'myday-row__meta' }, h('span', { class: 'myday-row__stage' }, act.stage), clash ? h('span', { class: 'clash-tag' }, `${icon('alert', 12)} clashes with another set`) : null)
+            h('p', { class: 'myday-row__meta' }, h('span', { class: 'myday-row__stage' }, act.stage), clash ? h('span', { class: 'clash-tag', html: `${icon('alert', 12)} clashes with another set` }) : null)
           ),
           h('button', { class: 'icon-btn remove', type: 'button', 'aria-label': `Remove ${act.name}`, html: icon('trash', 17) })
         );

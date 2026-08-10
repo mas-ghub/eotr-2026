@@ -189,6 +189,12 @@ button {
   color: var(--danger);
 }
 
+.offline-pill.offline {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
 .header-help {
   flex: 0 0 auto;
   width: 32px;

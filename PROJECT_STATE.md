@@ -258,6 +258,19 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
 - **Verified**: fresh isolated browser context → first-ever online load → go offline → cold launch
   renders **197 artist cards, 0 console errors, no white screen**. Full smoke suite still 23/23.
 
+## 8c. Offline pill states + raw-SVG leak fix (2026-08-10)
+
+- **Offline pill**: when the device has no connection the pill now shows **"Offline mode"** with a
+  wifi-off icon — non-clickable, no error on tap — instead of the misleading "Get offline audio"
+  button. It listens to `online`/`offline` events (no polling needed) and reverts to
+  "Get offline audio"/progress when back online. `offline.start()` also guards against running
+  without a connection. If clips are fully downloaded it still shows "Offline ready" even offline.
+- **Raw `<svg>` text leak (family's "clashes showing weird")**: `schedule.ts:85` passed
+  `icon('alert', 12)` — an SVG *string* — as a child node, so `h()` inserted it as a literal text
+  node ("<svg viewBox=…>…clashes with another set"). Fixed by passing it via the `html:` prop so it
+  renders as a real SVG element. Verified: clash tag innerHTML is a real `<svg>` with zero literal
+  `<svg` text; full scan of all `icon()` call sites confirmed this was the only occurrence.
+
 ## 9. Updating set times / the timetable (data refresh)
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
