@@ -2,6 +2,7 @@ import { loadData } from '../data';
 import { navigate } from '../router';
 import { h, icon } from '../ui';
 import { schedule } from '../store';
+import { weatherStrip } from '../weather';
 import { onViewCleanup } from '../lifecycle';
 import type { Act } from '../types';
 
@@ -13,6 +14,34 @@ function overlaps(a: Act, b: Act): boolean {
   return as < be && bs < ae;
 }
 
+/** "Gates open in N days · H hrs" in festival-local time. Never throws. */
+function festivalCountdown(): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(new Date());
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || '';
+    const now = new Date(`${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:00+01:00`);
+    const start = new Date('2026-09-03T12:00:00+01:00');
+    const diffMs = start.getTime() - now.getTime();
+    if (diffMs <= 0) return '';
+    const days = Math.floor(diffMs / 86400000);
+    const hrs = Math.floor((diffMs % 86400000) / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} · ${hrs} hr${hrs !== 1 ? 's' : ''} until Thursday`;
+    if (hrs > 0) return `${hrs} hr${hrs !== 1 ? 's' : ''} · ${mins} min until gates open`;
+    return `${mins} min until gates open`;
+  } catch {
+    return '';
+  }
+}
+
 export async function renderSchedule(): Promise<HTMLElement> {
   const { meta, acts } = await loadData();
   const root = h('div', { class: 'view myday-view' });
@@ -20,7 +49,21 @@ export async function renderSchedule(): Promise<HTMLElement> {
   const head = h(
     'header',
     { class: 'myday-head' },
-    h('div', {}, h('h2', { class: 'myday-title' }, 'My Day'), h('p', { class: 'myday-sub' }, 'Your personal timetable')),
+    h('div', {},
+      h('h2', { class: 'myday-title' }, 'My Day'),
+      h('p', { class: 'myday-sub' }, 'Your personal timetable'),
+      (() => {
+        const el = h('p', { class: 'myday-countdown' });
+        const update = () => {
+          const text = festivalCountdown();
+          el.innerHTML = text ? `${icon('clock', 12)} ${text}` : '';
+        };
+        update();
+        const t = setInterval(update, 60000);
+        onViewCleanup(() => clearInterval(t));
+        return el;
+      })()
+    ),
     h(
       'div',
       { class: 'myday-actions' },
@@ -29,6 +72,8 @@ export async function renderSchedule(): Promise<HTMLElement> {
     )
   );
   root.appendChild(head);
+
+  root.appendChild(weatherStrip(meta.days));
 
   const body = h('div', { class: 'myday-body' });
   root.appendChild(body);

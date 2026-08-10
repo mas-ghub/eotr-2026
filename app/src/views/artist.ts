@@ -269,8 +269,9 @@ export async function renderArtist(slug: string): Promise<HTMLElement> {
   }
 
   const links = artist.links.filter((l) => !/^https?:\/\/endoftheroadfestival\.com/i.test(l.url));
+  let chips: HTMLElement | null = null;
   if (links.length || artist.spotifyId) {
-    const chips = h('div', { class: 'link-chips' });
+    chips = h('div', { class: 'link-chips' });
     for (const link of links) {
       chips.appendChild(h('a', { class: 'link-chip', href: link.url, target: '_blank', rel: 'noopener' }, h('span', { html: icon(LINK_ICONS[link.label] || 'stage', 15) }), link.label));
     }
@@ -278,6 +279,28 @@ export async function renderArtist(slug: string): Promise<HTMLElement> {
       chips.appendChild(h('a', { class: 'link-chip', href: `https://open.spotify.com/artist/${artist.spotifyId}`, target: '_blank', rel: 'noopener' }, h('span', { html: icon('disc', 15) }), 'Listen on Spotify'));
     }
     body.appendChild(chips);
+  }
+
+  // "See them live" — opens Songkick search for this artist. Network-only:
+  // hidden when the device is offline (the page can't load anyway).
+  const liveChip = h(
+    'a',
+    { class: 'link-chip', href: `https://www.songkick.com/search?query=${encodeURIComponent(artist.name)}`, target: '_blank', rel: 'noopener' },
+    h('span', { html: icon('ticket', 15) }),
+    'See them live'
+  );
+  const applyOnline = () => liveChip.classList.toggle('is-offline', !navigator.onLine);
+  window.addEventListener('online', applyOnline);
+  window.addEventListener('offline', applyOnline);
+  onViewCleanup(() => {
+    window.removeEventListener('online', applyOnline);
+    window.removeEventListener('offline', applyOnline);
+  });
+  if (chips) {
+    chips.appendChild(liveChip);
+  } else {
+    const c = h('div', { class: 'link-chips' }, liveChip);
+    body.appendChild(c);
   }
 
   if (artist.bio) {

@@ -169,7 +169,8 @@ function buildShell(updated: string) {
     'footer',
     { class: 'app-footer' },
     h('p', {}, `Updated ${updated} · unofficial fan guide. Set times from Clashfinder; artists from the official End of the Road site.`),
-    h('p', {}, 'Preview clips are 30-second excerpts for discovery purposes.')
+    h('p', {}, 'Preview clips are 30-second excerpts for discovery purposes.'),
+    h('p', { class: 'app-footer__version' }, 'EOTR 2026 PWA · version 1.0.0')
   );
 
   const tabs = h('nav', { class: 'app-nav' });

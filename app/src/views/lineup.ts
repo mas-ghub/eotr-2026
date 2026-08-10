@@ -164,9 +164,17 @@ export async function renderLineup(): Promise<HTMLElement> {
           h('button', { class: 'chip day-chip' + (filters.day === d.key ? ' active' : ''), type: 'button', dataset: { day: d.key }, html: d.short })
         )
       )
-    )
+    ),
+    h('button', { class: 'chip surprise-chip', type: 'button', html: `${icon('shuffle', 14)} Surprise me` })
   );
   root.appendChild(search);
+
+  search.querySelector('.surprise-chip')!.addEventListener('click', () => {
+    const withPreviews = artists.filter((a) => a.previews.length > 0);
+    if (!withPreviews.length) return;
+    const pick = withPreviews[Math.floor(Math.random() * withPreviews.length)];
+    navigate(`#/artist/${pick.slug}`);
+  });
 
   const countEl = h('p', { class: 'results-count' });
   const grid = h('div', { class: 'artist-grid' });

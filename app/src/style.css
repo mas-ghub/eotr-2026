@@ -1368,6 +1368,133 @@ button[hidden] {
   transform: translateY(-1px);
 }
 
+/* Songkick "See them live" chip: hidden when offline (page can't load anyway). */
+.link-chip.is-offline {
+  display: none;
+}
+
+/* ============ Weather strip ============ */
+
+.weather-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: 12px 16px 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.weather-strip__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.weather-strip__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.weather-strip__note {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.weather-strip__days {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.weather-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border-radius: 10px;
+  background: var(--bg-2);
+}
+
+.weather-day__short {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.weather-day__icon {
+  color: var(--accent-2);
+  line-height: 0;
+}
+
+.weather-day__temp {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.weather-day__rain {
+  font-size: 10.5px;
+  color: var(--green);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+@media (max-width: 420px) {
+  .weather-strip {
+    margin: 10px 12px 6px;
+    padding: 10px 10px;
+  }
+  .weather-strip__days {
+    gap: 6px;
+  }
+}
+
+/* ============ My Day countdown ============ */
+
+.myday-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.myday-countdown:empty {
+  display: none;
+}
+
+/* ============ Surprise me chip ============ */
+
+.surprise-chip {
+  flex: 0 0 auto;
+}
+
+.surprise-chip svg {
+  transition: transform 0.3s ease;
+}
+
+.surprise-chip:hover svg {
+  transform: rotate(180deg);
+}
+
+.app-footer__version {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 .artist-bio {
   color: var(--ink-soft);
   font-size: 15px;

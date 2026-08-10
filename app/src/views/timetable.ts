@@ -3,6 +3,7 @@ import { navigate } from '../router';
 import { h, sheet, icon } from '../ui';
 import { schedule } from '../store';
 import { scheduleButton } from './common';
+import { weatherStrip } from '../weather';
 import { onViewCleanup } from '../lifecycle';
 import type { Act } from '../types';
 
@@ -89,6 +90,8 @@ export async function renderTimetable(): Promise<HTMLElement> {
   const root = h('div', { class: 'view tt-view' });
   const head = h('header', { class: 'tt-head' }, h('h2', { class: 'tt-title' }, 'Timetable'), h('p', { class: 'tt-sub' }, 'Tap a set for details or to add it to My Day.'));
   root.appendChild(head);
+
+  root.appendChild(weatherStrip(meta.days));
 
   const tabs = h('nav', { class: 'tt-tabs', role: 'tablist' }, ...meta.days.map((d) => {
     const isToday = now && now.dayKey === d.key;

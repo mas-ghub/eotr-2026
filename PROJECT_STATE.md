@@ -274,6 +274,26 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   producing alternating `12:00`/`00:00`. Fixed to `Math.floor(hh / 60) % 24`. Labels now render
   correctly 09:00→02:00 across the festival day (including the post-midnight hours).
 
+## 10. Festival-fun additions (weather, countdown, live dates, surprise me, version)
+
+All additive — no existing layout/behavior changed, nothing can break if a source fails.
+
+- **Weather strip** (`app/src/weather.ts`, new): shows the 4 festival days (icon, high/low °C,
+  rain %) at the top of the **Timetable** and **My Day** pages. Uses the free Open-Meteo API
+  (no key): live forecast when within ~16 days, otherwise the long-term climate average for the
+  exact festival dates (labelled "typical conditions"). Results are cached in localStorage so it
+  works offline. Every failure path is caught — the strip simply stays empty.
+- **Festival countdown** (My Day header): "23 days · 16 hrs until Thursday" in Europe/London,
+  ticking each minute, hidden once gates open. Fully error-trapped.
+- **"See them live"** (artist pages): a link chip that opens Songkick search for that artist in a
+  new tab. Network-only — hidden automatically when the device is offline.
+- **"Surprise me"** (Lineup): a shuffle chip that jumps to a random artist that has previews.
+- **Version number**: "EOTR 2026 PWA · version 1.0.0" in the footer.
+- **Icons added** to `ui.ts`: sun, sunCloud, cloud, drizzle, rain, snow, thunder, fog, droplet,
+  shuffle, ticket.
+- SW bumped to `eotr2026-v1.7.0`; smoke suite still 23/23; all features verified in a headless
+  browser with zero console errors.
+
 ## 9. Updating set times / the timetable (data refresh)
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
