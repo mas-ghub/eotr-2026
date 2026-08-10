@@ -241,6 +241,23 @@ Deezer is score-gated (`pickBest`, min 0.7); iTunes is not. When Deezer has no a
   GitHub Pages (bundle `index-CPxqiZBh.js`). On a device, reload the app once (the updated SW v1.5.0
   serves the new assets).
 
+## 8b. White-screen-on-offline fix (SW v1.6.0) — 2026-08-10
+
+- **Bug**: cold-launching the installed PWA with no signal produced a white screen. Root causes in
+  `app/public/sw.js`:
+  1. The hashed JS/CSS bundles (`./assets/index-*.js`) were **not** in `PRECACHE` (they change each
+     build), so on a fresh install they only reached cache if requested *through* the SW — which
+     often didn't happen before `clients.claim()`. Offline, `index.html` loaded but the bundle
+     returned `Response.error()` → blank page.
+  2. `cacheFirst` only looked in `RUNTIME_CACHE`, never the versioned `APP_CACHE` where precache lives.
+  3. The `activate` handler deleted **every** cache except APP/RUNTIME — including
+     `eotr2026-clips`, so each SW update silently wiped the user's 114 MB of downloaded offline audio.
+- **Fixes**: `install` now scans `index.html` and precaches all referenced `./assets/*` bundles;
+  `cacheFirst` falls back to `APP_CACHE`; `activate` whitelists `CLIPS_CACHE` so downloaded audio
+  survives updates. SW bumped to `eotr2026-v1.6.0`.
+- **Verified**: fresh isolated browser context → first-ever online load → go offline → cold launch
+  renders **197 artist cards, 0 console errors, no white screen**. Full smoke suite still 23/23.
+
 ## 9. Updating set times / the timetable (data refresh)
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
