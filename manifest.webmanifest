@@ -1,0 +1,24 @@
+{
+  "id": "eotr-2026-guide",
+  "name": "End of the Road 2026",
+  "short_name": "EOTR 2026",
+  "description": "End of the Road 2026 lineup, stage times, personal timetable and 30-second music previews. Works offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e241c",
+  "theme_color": "#0e241c",
+  "lang": "en",
+  "categories": ["music", "entertainment", "travel"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Lineup", "url": "./#/lineup", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Timetable", "url": "./#/timetable", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My Day", "url": "./#/myday", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
