@@ -14,7 +14,9 @@ import { renderSchedule } from './views/schedule';
 import { renderArtist } from './views/artist';
 import { renderPrint } from './views/print';
 import { renderChat } from './views/chat';
+import { renderMap } from './views/map';
 import { chatStart, onUnread, onIncoming, unlockAudio, playChatSound } from './chat';
+import { presenceStart } from './location';
 
 let appRoot: HTMLElement;
 let mainEl: HTMLElement;
@@ -199,7 +201,8 @@ function buildShell(updated: string) {
     { route: '#/lineup', label: 'Lineup', icon: 'list' },
     { route: '#/timetable', label: 'Timetable', icon: 'clock' },
     { route: '#/myday', label: 'My Day', icon: 'heart', badge: () => navBadge },
-    { route: '#/chat', label: 'Chat', icon: 'chat', badge: () => chatBadge }
+    { route: '#/chat', label: 'Chat', icon: 'chat', badge: () => chatBadge },
+    { route: '#/map', label: 'Map', icon: 'pin' }
   ];
   for (const t of tabsDef) {
     const tab = h('a', { class: 'app-nav__tab', href: t.route, dataset: { route: t.route }, html: `${icon(t.icon, 22)}<span>${t.label}</span>` });
@@ -252,6 +255,9 @@ async function renderRoute(route: Route) {
         break;
       case 'chat':
         view = await renderChat();
+        break;
+      case 'map':
+        view = await renderMap();
         break;
       case 'artist':
         view = await renderArtist(route.slug || '');
@@ -326,6 +332,7 @@ async function boot() {
   maybeIosHint();
   maybePromptName();
   wireChatNotifications();
+  void presenceStart();
   unlockAudioOnGesture();
   void offline.init();
 

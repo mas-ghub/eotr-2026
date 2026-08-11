@@ -2219,6 +2219,181 @@ button[hidden] {
   }
 }
 
+/* ============ Map / find your friends ============ */
+
+.map-view {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--header-h) - var(--nav-h) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
+}
+
+.map-head .chat-title {
+  font-size: clamp(24px, 6vw, 34px);
+}
+
+.map-online {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 16px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.map-online::-webkit-scrollbar {
+  display: none;
+}
+
+.map-online__empty {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 4px 2px;
+}
+
+.map-online__chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: 600 12.5px var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.map-online__chip:hover {
+  border-color: var(--green);
+}
+
+.map-online__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(47, 107, 79, 0.18);
+}
+
+.map-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  margin: 0 16px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.map-canvas .leaflet-container {
+  background: var(--bg-2);
+  font-family: var(--font-body);
+}
+
+.map-canvas .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.map-canvas .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.map-canvas a.leaflet-popup-close-button {
+  color: var(--muted);
+}
+
+.map-pop__name {
+  font-weight: 750;
+  font-size: 13.5px;
+}
+
+.map-pop__time {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.map-pop__msg {
+  width: 100%;
+}
+
+.map-controls {
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-share {
+  width: 100%;
+}
+
+.map-share.map-share--on {
+  background: var(--green);
+}
+
+.map-share[disabled] {
+  opacity: 0.6;
+}
+
+.map-share-note {
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 16px;
+}
+
+.map-share-note.on {
+  color: var(--green);
+}
+
+.map-share-note.denied {
+  color: var(--danger);
+}
+
+.map-share-note.conn {
+  color: var(--accent-2);
+}
+
+.map-privacy {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Leaflet zoom/attribution over a dark theme */
+[data-theme='dark'] .map-canvas .leaflet-bar a {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme='dark'] .map-canvas .leaflet-bar a:hover {
+  background: var(--bg-2);
+}
+
+[data-theme='dark'] .map-canvas .leaflet-control-attribution {
+  background: rgba(20, 26, 22, 0.75);
+  color: var(--muted);
+}
+
+[data-theme='dark'] .map-canvas .leaflet-control-attribution a {
+  color: var(--accent-2);
+}
+
 /* ============ Conversations (private chats) ============ */
 
 .chat-seg {

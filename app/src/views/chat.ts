@@ -513,6 +513,22 @@ export async function renderChat(): Promise<HTMLElement> {
   renderScreen();
   if (screen.kind === 'wall') markChatSeen();
 
+  // Jump straight into a conversation when arriving from the map ("Message").
+  try {
+    const pending = sessionStorage.getItem('eotr2026.pendingconv.v1');
+    if (pending) {
+      sessionStorage.removeItem('eotr2026.pendingconv.v1');
+      if (conversations().some((c) => c.id === pending)) {
+        screen = { kind: 'conv', convId: pending };
+        buildSeg();
+        buildHead();
+        renderScreen();
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   const tick = setInterval(() => {
     body.querySelectorAll('.chat-msg__time').forEach((el) => {
       const ts = Number((el as HTMLElement).dataset.ts || 0);

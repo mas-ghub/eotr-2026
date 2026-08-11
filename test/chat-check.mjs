@@ -25,10 +25,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 await page.goto(BASE + '/#/lineup', { waitUntil: 'networkidle2', timeout: 30000 });
 await sleep(1500);
 
-// Nav has 4 tabs including Chat
+// Nav has 5 tabs including Chat
 const tabCount = await page.$$eval('.app-nav__tab', (els) => els.length);
 const chatTab = await page.$eval('.app-nav__tab[href="#/chat"]', (el) => !!el).catch(() => false);
-ok('chat: nav shows 4 tabs incl. Chat', tabCount === 4 && chatTab, `${tabCount} tabs`);
+ok('chat: nav shows 5 tabs incl. Chat', tabCount === 5 && chatTab, `${tabCount} tabs`);
 
 // Active-tab highlight works (regression fix) on the Lineup page
 const lineupActive = await page.$eval('.app-nav__tab[href="#/lineup"]', (el) => el.classList.contains('active')).catch(() => false);

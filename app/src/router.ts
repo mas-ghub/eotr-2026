@@ -1,4 +1,4 @@
-export type RouteName = 'lineup' | 'timetable' | 'myday' | 'artist' | 'chat' | 'print-program' | 'print-schedule' | 'notfound';
+export type RouteName = 'lineup' | 'timetable' | 'myday' | 'artist' | 'chat' | 'map' | 'print-program' | 'print-schedule' | 'notfound';
 
 export interface Route {
   name: RouteName;
@@ -18,6 +18,8 @@ export function parseRoute(hash: string): Route {
       return { name: 'myday' };
     case 'chat':
       return { name: 'chat' };
+    case 'map':
+      return { name: 'map' };
     case 'artist':
       return parts[1] ? { name: 'artist', slug: parts[1] } : { name: 'lineup' };
     case 'print':
