@@ -7,6 +7,7 @@ import { player } from './audio';
 import { offline, fmtBytes, type OfflineStatus } from './offline';
 import { h, icon, toast, sheet } from './ui';
 import { initTheme, toggleTheme, currentTheme } from './theme';
+import { maybePromptName } from './greeting';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
 import { renderSchedule } from './views/schedule';
@@ -278,6 +279,7 @@ async function boot() {
   registerServiceWorker();
   installPrompt();
   maybeIosHint();
+  maybePromptName();
   void offline.init();
 
   try {

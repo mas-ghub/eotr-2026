@@ -19,6 +19,7 @@ offline 20s audio previews per artist.
 | `src/data.ts` | Loads `data/meta.json` + `data/acts.json` + `data/artists.json` (single cache) |
 | `src/store.ts` | "My Day" schedule store (localStorage) |
 | `src/theme.ts` | Dark/light theme: `data-theme` on `<html>`, persisted choice, system-pref fallback |
+| `src/greeting.ts` | Name greeting: first-launch welcome prompt, time-of-day hero pill, localStorage name |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -315,6 +316,25 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
 - SW bumped to `eotr2026-v1.8.0`. Smoke suite still **23/23**; new feature suite
   `test/feature-check.mjs` **7/7** (toggle flips + persists across reload, body bg matches theme,
   day persists across navigation, zero console errors). Deployed to GitHub Pages.
+
+## 12. Name greeting (2026-08-11)
+
+- **First-launch welcome prompt** (`app/src/greeting.ts`, new): a spring-animated centered card
+  (`welcome-overlay`/`welcome-card` CSS) slides up ~0.9s after boot asking for a first name.
+  Input is sanitised (`cleanName`: strips everything except letters/numbers/spaces/`.-'`,
+  collapses whitespace, trims, caps at 24 chars — XSS-safe), validates non-empty (shake + error),
+  persists to localStorage (`eotr2026.name.v1`), and only ever asks once
+  (`eotr2026.nameasked.v1` marker). Dismissing by tapping the backdrop skips it.
+- **Time-of-day hero pill** (Lineup): "Good morning / Good afternoon / Good evening / Good night,
+  <name> — enjoy the festival", computed in Europe/London. Tapping it re-opens the prompt so the
+  name can be changed later (the pill updates in place + success toast). Renders via
+  `greetingEl()` in `views/lineup.ts`; `refreshGreeting()` swaps the visible pill after the
+  first-launch save.
+- Notes: browsers cannot read the device owner's name — the prompt is the way in. Avatar/images
+  and a "name must be unique" rule were explicitly deferred by the user; the user's next ask is a
+  live multi-user chat (backend, online-only, with a notification sound) — see `plan.md` Phase 2.
+- SW bumped to `eotr2026-v1.9.0`. Smoke **23/23**, feature **7/7**, new greeting suite
+  `test/greeting-check.mjs` **9/9**. Deployed to GitHub Pages.
 
 ## 9. Updating set times / the timetable (data refresh)
 

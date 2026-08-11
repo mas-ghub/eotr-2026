@@ -550,6 +550,159 @@ button[hidden] {
   color: var(--accent);
 }
 
+/* Tappable time-of-day greeting in the hero ("Good afternoon, Sam"). */
+.hero__greeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 15px;
+  padding: 8px 15px;
+  border: 1px solid rgba(247, 239, 221, 0.22);
+  border-radius: 999px;
+  background: rgba(247, 239, 221, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #f7efdd;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: greeting-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: background 0.2s, transform 0.2s, border-color 0.2s;
+}
+
+.hero__greeting:hover {
+  background: rgba(247, 239, 221, 0.16);
+  transform: translateY(-1px);
+}
+
+.hero__greeting .icon {
+  color: var(--accent-2);
+}
+
+@keyframes greeting-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ============ Welcome / name prompt ============ */
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 20, 16, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.welcome-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.welcome-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 28px 22px 22px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  transform: translateY(26px) scale(0.92);
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+}
+
+.welcome-card.open {
+  transform: none;
+  opacity: 1;
+}
+
+.welcome-card__icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 12px;
+  border-radius: 18px;
+  background: linear-gradient(158deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(232, 96, 47, 0.35);
+}
+
+.welcome-card__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.welcome-card__title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.welcome-card__sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.welcome-card__input {
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  font: 500 15px var(--font-body);
+  color: var(--ink);
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.welcome-card__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(232, 96, 47, 0.14);
+}
+
+.welcome-card__input.invalid {
+  border-color: var(--danger);
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.welcome-card__err {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.welcome-card__go {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.welcome-card__note {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
 .shape {
   position: absolute;
   border-radius: 50%;

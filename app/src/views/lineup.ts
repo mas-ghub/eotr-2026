@@ -3,6 +3,7 @@ import { navigate } from '../router';
 import { h, icon, imageEl, debounce, iconEl } from '../ui';
 import { schedule } from '../store';
 import { typeBadge, dayShort } from './common';
+import { greetingEl } from '../greeting';
 import type { Artist, Act, ActType } from '../types';
 
 interface Filters {
@@ -138,7 +139,8 @@ export async function renderLineup(): Promise<HTMLElement> {
       h('span', {}, `${meta.stats.acts} sets`),
       h('span', { class: 'dot' }, '·'),
       h('span', {}, `${meta.stats.artistsWithPreviews} with previews`)
-    )
+    ),
+    greetingEl()
   );
   root.appendChild(hero);
 
