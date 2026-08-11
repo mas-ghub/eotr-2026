@@ -13,6 +13,7 @@ import {
   stopSharing,
   shareStatus,
   onlineUsersSnapshot,
+  locationUsersSnapshot,
   colorForUid,
   type OnlineUser,
   type LocationUser,
@@ -143,26 +144,61 @@ export async function renderMap(): Promise<HTMLElement> {
 
   // ---- Leaflet map ----
   let map: L.Map | null = null;
+  let mapInitDone = false;
+  let ro: ResizeObserver | null = null;
+  let onResize: (() => void) | null = null;
+  let Lmod: typeof L | null = null;
   const markers = new Map<string, L.CircleMarker>();
   let centerDone = false;
 
-  const paint = async (users: LocationUser[]) => {
+  const ensureMap = async (): Promise<L.Map | null> => {
     const container = document.getElementById('leafmap');
-    if (!container) return; // view not in the DOM yet — next snapshot will init
+    if (!container) return null; // view not in the DOM yet — retry on next snapshot
     const L = await import('leaflet');
-    if (!map) {
-      map = L.map(container, { zoomControl: true, attributionControl: true });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(map);
-      map.setView(FESTIVAL_CENTER, FESTIVAL_ZOOM);
-      requestAnimationFrame(() => map?.invalidateSize());
+    Lmod = L;
+    if (mapInitDone && map) return map;
+    // The container is inside a view transition and may briefly have zero
+    // height on iOS. Wait until it actually has real pixels before creating the
+    // map — creating it at 0×0 is what produces the diagonal/partial tiles.
+    const h = container.clientHeight;
+    if (h < 10) return null;
+    map = L.map(container, { zoomControl: true, attributionControl: true });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    map.setView(FESTIVAL_CENTER, FESTIVAL_ZOOM);
+    mapInitDone = true;
+
+    // Re-measure whenever the container resizes (flex/layout settling after the
+    // view transition, URL-bar show/hide on iOS, etc.).
+    const invalidate = () => {
+      try {
+        map?.invalidateSize(false);
+      } catch {
+        /* ignore */
+      }
+    };
+    onResize = invalidate;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(invalidate);
+      ro.observe(container);
     }
+    // Safety net for browsers/transitions that don't fire RO or fire it too early.
+    window.setTimeout(invalidate, 120);
+    window.setTimeout(invalidate, 500);
+    window.setTimeout(invalidate, 1500);
+    window.addEventListener('resize', invalidate);
+    return map;
+  };
+
+  const paint = async (users: LocationUser[]) => {
+    const m = await ensureMap();
+    if (!m) return;
     // Remove markers no longer present
-    for (const [uid, m] of markers) {
+    for (const [uid, mk] of markers) {
       if (!users.some((u) => u.uid === uid)) {
-        m.remove();
+        mk.remove();
         markers.delete(uid);
       }
     }
@@ -177,17 +213,17 @@ export async function renderMap(): Promise<HTMLElement> {
         existing.bindPopup(bindPopup(u, mine));
         continue;
       }
-      const mk = L.circleMarker([u.lat, u.lng], {
+      const mk = (Lmod ?? (await import('leaflet'))).circleMarker([u.lat, u.lng], {
         radius: mine ? 14 : 10,
         color,
         weight: 2,
         fillColor: color,
         fillOpacity: 0.35
-      }).addTo(map);
+      }).addTo(m);
       mk.bindPopup(bindPopup(u, mine));
       markers.set(u.uid, mk);
       if (mine && !centerDone && myUid) {
-        map.setView([u.lat, u.lng], FESTIVAL_ZOOM);
+        m.setView([u.lat, u.lng], FESTIVAL_ZOOM);
         centerDone = true;
       }
     }
@@ -223,10 +259,25 @@ export async function renderMap(): Promise<HTMLElement> {
   renderOnline(onlineUsersSnapshot());
   refreshShare();
 
+  // The initial onLocations fire can happen before the view is laid out (view
+  // transition / zero-height container on iOS). Keep retrying until the map is
+  // actually built, so it never sits as a blank/partial-tile square.
+  const initRetry = window.setInterval(() => {
+    if (mapInitDone) {
+      window.clearInterval(initRetry);
+      return;
+    }
+    void paint(locationUsersSnapshot());
+  }, 250);
+  window.setTimeout(() => window.clearInterval(initRetry), 10000);
+
   onViewCleanup(() => {
     offOnline();
     offShare();
     offLocs();
+    window.clearInterval(initRetry);
+    if (ro) ro.disconnect();
+    if (onResize) window.removeEventListener('resize', onResize);
     if (map) {
       map.remove();
       map = null;
