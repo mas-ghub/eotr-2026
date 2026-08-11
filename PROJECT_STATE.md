@@ -20,8 +20,8 @@ offline 20s audio previews per artist.
 | `src/store.ts` | "My Day" schedule store (localStorage) |
 | `src/theme.ts` | Dark/light theme: `data-theme` on `<html>`, persisted choice, system-pref fallback |
 | `src/greeting.ts` | Name greeting: first-launch welcome prompt, time-of-day hero pill, localStorage name |
-| `src/chat.ts` | Firebase chat engine: lazy Firestore init (code-split), realtime wall, unread badge, Web Audio chime |
-| `src/views/chat.ts` | `#/chat` view: message bubbles, composer ("Posting as …"), status pill, not-configured state |
+| `src/chat.ts` | Firebase chat engine: lazy Firestore init (code-split), anonymous auth, realtime wall + conversations, DMs/groups, unread badge, Web Audio chime |
+| `src/views/chat.ts` | `#/chat` view: Everyone wall + Chats list + conversation threads, composer ("Posting as …"), tap-name-to-DM, New chat picker, status pill |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -373,6 +373,41 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
     greeting **9/9**, zero console errors.
   - Note: the security rules deliberately forbid deletes, so the handful of verification test
     messages ("Hello from Alpha…", "Hello from the live site…") remain in the wall. Harmless.
+
+## 14. Private DMs + group chats (2026-08-11)
+
+- **Identity**: Firebase **Anonymous Auth** (user enabled it in the console — needed for the
+  participant-scoped rules). Each device silently signs in with a stable uid (same across
+  reloads); no logins, no passwords. Free on Spark (50k anonymous users/mo).
+- **Data model** (`firestore.rules` + `src/chat.ts`): a new top-level `conversations`
+  collection. Each doc: `type` (`dm`/`group`), `participants` (uid array), `names` (uid→name
+  map), `createdBy`, `lastAt`/`lastText` (for the Chats list previews + reordering). Messages
+  live in a `conversations/{id}/messages` subcollection (same shape as the wall + `senderId`).
+  Rules: read/create only for members (checked via `request.auth.uid in participants`),
+  `senderId` locked to the authed uid, sizes capped, no edit/delete.
+- **`src/chat.ts`**: `ensureAuth()` (lazy `signInAnonymously`), `subscribeConvs()`
+  (`array-contains` my uid), `listenConversation(convId)` for a thread, `openDm(otherUid,name)`
+  (deterministic `dm_<a>_<b>` id via a **merge-upsert** — no `getDoc` first, because the read
+  rule correctly denies reads of docs that don't exist yet), `createGroup(title,members)`
+  (random `grp_` id), `sendConversationMessage` (adds to subcollection + touches `lastAt`/
+  `lastText`), `knownPeople()` dedupes wall/conversation names **by name** since each anonymous
+  device has a unique uid (otherwise the picker shows one row per device). Unread tracking is
+  per conversation (`eotr2026.chat.seen.conv.v1.<id>`) and folded into the nav badge total via
+  `onUnread`/`unreadTotal`. A single `onIncoming` event feeds the app-wide toast + chime for
+  wall, DM, and group messages.
+- **`src/views/chat.ts`**: three screens — Everyone wall, Chats list (avatar initial, unread
+  dot, last-message preview, relative time), and a conversation thread (back button, bubbles,
+  auto-scroll). The wall's tappable name buttons open a DM (asking for a name first if unset).
+  "New chat" opens a bottom-sheet picker: pick 1 = DM, pick 2+ = group with an optional name.
+- **Two real bugs found during verification**: (1) `messageEl` attached the tap handler via
+  `instanceof HTMLButtonElement`, but `h()` always returns a generic `HTMLElement` — switched to
+  a class check. (2) `openDm` did `getDoc` on a not-yet-existing doc, which the read rule
+  correctly denied → silently returned null. Both fixed; `firestore.rules` also now allows
+  `resource == null` reads so future code can safely check existence.
+- **Status**: SW bumped to `eotr2026-v1.12.0`. New suites: `test/chat-e2e.mjs` **10/10**
+  (wall + DM cross-device + privacy), `test/chat-e2e-live.mjs` **10/10** (against the deployed
+  site), `test/group-e2e.mjs` **7/7** (3-device group). Full regression green: smoke **23/23**,
+  feature **7/7**, greeting **9/9**, chat-check **9/9**. Deployed to GitHub Pages.
 ## 9. Updating set times / the timetable (data refresh)
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
