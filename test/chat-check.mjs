@@ -44,7 +44,10 @@ const chatActive = await page.$eval('.app-nav__tab[href="#/chat"]', (el) => el.c
 ok('chat: chat tab is highlighted on #/chat', chatActive);
 
 const statusText = await page.$eval('.chat-status', (el) => el.textContent.trim()).catch(() => null);
-ok('chat: shows not-configured status', statusText === 'Chat is coming soon', statusText || 'n/a');
+// With app/.env set the wall is live; without keys it falls back to "coming soon".
+const configured = statusText === 'Live' || statusText === 'Connecting…' || (statusText && statusText.startsWith('Live'));
+const comingSoon = statusText === 'Chat is coming soon';
+ok('chat: status is live or coming-soon', configured || comingSoon, statusText || 'n/a');
 
 const hasComposer = await page.$eval('.chat-composer', (el) => !!el).catch(() => false);
 ok('chat: composer rendered', hasComposer);
