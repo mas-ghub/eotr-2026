@@ -363,13 +363,16 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
 - **Regression fixed en route**: the bottom-nav active highlight was comparing `href="#/lineup"`
   against `route.name` (`lineup`) — never matched, so no tab ever appeared active. Now compares
   `dataset.route` (artist pages keep Lineup highlighted). Covered by `chat-check.mjs`.
-- **Not configured yet**: app ships in a graceful "Chat is coming soon" state. One-time setup for
-  the user (console → project → web app → enable Firestore → publish `firestore.rules` → fill
-  `app/.env` → `node app/scripts/verify-chat.mjs` → rebuild + deploy). See `plan.md` §4.
-- **Status**: SW bumped to `eotr2026-v1.10.0`. New suite `test/chat-check.mjs` **9/9**; smoke
-  **23/23**, feature **7/7**, greeting **9/9**. `app/scripts/verify-chat.mjs` validates keys via a
-  zero-dependency Firestore REST call.
-
+- **Configured + LIVE (2026-08-11)**: user created Firebase project `eotr-2026-chat`, enabled
+  Firestore (Standard edition, `europe-west2`, production mode), published `firestore.rules`,
+  and keys now live in `app/.env` (gitignored). `verify-chat.mjs` → **PASS**.
+  - **SW bumped to `eotr2026-v1.11.0`** so installed clients fetch the bundle with config baked in.
+  - New suites: `test/chat-e2e.mjs` **7/7** (local two-device realtime), `test/chat-live-e2e.mjs`
+    **3/3** (against the deployed site), `chat-check.mjs` **9/9** (status now accepts
+    live/connecting/coming-soon). Full regression still green: smoke **23/23**, feature **7/7**,
+    greeting **9/9**, zero console errors.
+  - Note: the security rules deliberately forbid deletes, so the handful of verification test
+    messages ("Hello from Alpha…", "Hello from the live site…") remain in the wall. Harmless.
 ## 9. Updating set times / the timetable (data refresh)
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from

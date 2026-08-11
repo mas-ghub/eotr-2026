@@ -6,23 +6,23 @@ _Written end of day 2026-08-10. Updated 2026-08-11 (dark mode + timetable fix + 
 
 ## 1. Where we are (all done, tested, LIVE)
 
-Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.10.0**, repo `mas-ghub/eotr-2026` (public).
+Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.11.0**, repo `mas-ghub/eotr-2026` (public).
 
 **Working, verified, deployed:**
 
 - Lineup, Timetable (with fixed 09:00→02:00 hour labels), My Day schedule + clash flags, artist pages, film/Cinema, print views.
-- **Chat / guestbook (new)** — a shared message wall for everyone at the festival, built on Firebase Firestore. New messages pop up app-wide with a soft chime + toast and a green badge on the Chat tab. Online only (Firestore needs a connection). **Still shows "Chat is coming soon" until the Firebase setup in §4 is done.**
-- **Name greeting**: first-launch welcome card → tappable time-of-day hero pill ("Good morning, Sam — enjoy the festival"). The chat composer reuses the stored name ("Posting as Sam", tap to change).
+- **Chat / guestbook — LIVE** ✅ Firebase connected (project `eotr-2026-chat`, Firestore Standard edition, `europe-west2`, rules published from `firestore.rules`). Shared message wall for everyone: new messages pop up app-wide with a chime + toast + green badge on the Chat tab. Verified end-to-end against the deployed site: a message posted on one device appears live on another. The 2-3 test messages from verification ("Hello from Alpha…", "Hello from the live site…") are still in the wall.
+- **Name greeting**: first-launch welcome card → tappable time-of-day hero pill. The chat composer reuses the stored name ("Posting as Sam", tap to change).
 - **Dark mode**: moon/sun toggle in the header — persists, follows OS until chosen, syncs status-bar theme-color, works offline.
 - **Timetable remembers its day** across navigation.
-- **Nav active-tab highlight fixed** (was comparing `#/lineup` to `lineup` — never highlighted; now `dataset.route`).
-- Audio: 684 bundled offline clips (655 music + 29 film trailers), correct-artist audio + links.
-- Offline: "Get offline audio" pill → downloads all clips → "Offline ready ✓"; white-screen bug fixed; pill shows "Offline mode" when disconnected.
+- **Nav active-tab highlight** now works (was comparing `href` to `route.name`).
+- Audio: 684 bundled offline clips, correct-artist audio + links.
+- Offline: "Get offline audio" pill; white-screen bug fixed; pill shows "Offline mode" when disconnected.
 - Header: offline pill + dark toggle + "?" help sheet. Install button Android-only.
 - Audio player: 5-bar equalizer, progress bar + timer, single-track exclusivity.
 - Festival-fun: weather strip, countdown, "See them live" (Songkick), "Surprise me", version footer.
 
-**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke **23/23** · feature (dark/day) **7/7** · greeting **9/9** · chat (not-configured state) **9/9** · zero console errors.
+**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke **23/23** · feature (dark/day) **7/7** · greeting **9/9** · chat **9/9** · **chat e2e 7/7** (local two-device) · **live-site e2e 3/3** · zero console errors.
 
 ---
 
@@ -64,24 +64,15 @@ curl -s "https://mas-ghub.github.io/eotr-2026/sw.js" | grep CACHE_VERSION
 
 ## 4. Ideas queued (Phase 2 — additive only, same style)
 
-### Chat setup — THE NEXT ACTION (one-time, ~10 min, needs the user's Google account)
+### Chat setup — DONE ✅ (completed 2026-08-11)
 
-The chat feature is **built, tested and deployed** but sits in a graceful "Chat is coming soon"
-state until Firebase is connected. The user must do this (it needs their Google login):
+Firebase project `eotr-2026-chat` created by the user; Firestore **Standard edition**,
+`europe-west2`, production mode; `firestore.rules` published; keys in `app/.env` (gitignored).
+`node app/scripts/verify-chat.mjs` → **PASS**. Chat verified live on the deployed site.
 
-1. **console.firebase.google.com → Add project** (e.g. `eotr-2026-chat`; skip Analytics).
-2. Overview → **Web `</>`** → register an app (e.g. `eotr-2026`) → copy the `firebaseConfig`.
-3. **Build → Firestore Database → Create database** → *Production mode*, region `europe-west2`.
-4. **Rules** tab → paste the contents of **`firestore.rules`** (in this repo) → **Publish**.
-5. Copy **`app/.env.example`** → **`app/.env`** and paste the `VITE_FIREBASE_*` values.
-6. `node app/scripts/verify-chat.mjs` → expect `PASS`, then `npm run build` + redeploy
-   (`npx --yes gh-pages -d app/dist`). No SW bump needed for a data-only change? — **no, always
-   bump CACHE_VERSION** so devices pull the new bundle with the keys baked in.
-7. Verify on a phone: open Chat → set your name → send a message → a second device/incognito
-   sees it arrive with a chime + badge.
-
-The Firebase web keys are public by design; `firestore.rules` is the real protection
-(anyone can read/post, nothing editable/deletable, sizes capped).
+If it ever needs re-doing, the steps were: console → Add project → register web app → copy
+`firebaseConfig` → Firestore Database (Standard, `europe-west2`) → publish `firestore.rules` →
+fill `app/.env` → `node app/scripts/verify-chat.mjs` → `npm run build` + deploy.
 
 ### Backlog (not started)
 
@@ -105,6 +96,7 @@ The Firebase web keys are public by design; `firestore.rules` is the real protec
 
 ## 6. First thing tomorrow if resuming
 
-1. `git status` should be clean. Confirm live SW is v1.10.0.
-2. Run `npm run dev`, spot-check: chat tab → "Chat is coming soon", greeting prompt on fresh profile, dark toggle, timetable day persistence.
-3. **Complete the Firebase chat setup** (§4) with the user — the code is done, only the account-side steps + `.env` remain, then rebuild + redeploy and verify two devices can chat.
+1. `git status` should be clean. Confirm live SW is v1.11.0.
+2. Run `npm run dev`, spot-check: chat (should show Live + existing messages), greeting prompt on fresh profile, dark toggle, timetable day persistence.
+3. Try the chat from two phones (or phone + incognito) to feel the real-time arrival + chime + badge.
+4. Then pick from the backlog: set reminders, personal notes, or chat hardening (name uniqueness / spam protection).
