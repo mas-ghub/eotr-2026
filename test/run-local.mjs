@@ -1,6 +1,7 @@
 // Local e2e runner — builds the app with VITE_FIRESTORE_PREFIX=devtest_ so every
 // test writes ONLY to isolated devtest_* Firestore collections (never the live
-// app data), starts a preview, runs the suites, then cleans up.
+// app data), starts a preview, VERIFIES the served bundle really is the isolated
+// one, runs the suites, then cleans up.
 //   node test/run-local.mjs
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,11 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = join(here, '..', 'app');
 const testDir = here;
+
+// A dedicated port so a lingering production preview on :4173 can never be
+// accidentally hit by the suites.
+const PORT = 4174;
+const BASE = `http://localhost:${PORT}`;
 
 const SUITES = [
   'smoke.mjs',
@@ -47,15 +53,28 @@ function waitForServer(url, tries = 40) {
 }
 
 async function killPreview() {
-  // best-effort: kill any process running 'vite preview' on 4173.
-  const script =
-    "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'vite.*preview.*4173' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+  // best-effort: kill any process running 'vite preview' on the test port.
+  const script = `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'vite.*preview.*${PORT}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
   await new Promise((resolve) => {
     const child = spawn('powershell', ['-NoProfile', '-Command', script], { cwd: here, shell: false, stdio: 'ignore' });
     child.on('close', resolve);
     child.on('error', resolve);
   });
   await new Promise((r) => setTimeout(r, 500));
+}
+
+/** Guard: confirm the served page really loads the devtest_ bundle, so a stale
+ *  or wrong preview can never silently run the suites against production. */
+async function verifyIsolatedBundle() {
+  try {
+    const html = await (await fetch(BASE + '/')).text();
+    const js = html.match(/src="([^"]+\.js)"/);
+    if (!js) return false;
+    const code = await (await fetch(BASE + js[1])).text();
+    return code.includes('devtest_');
+  } catch {
+    return false;
+  }
 }
 
 const started = Date.now();
@@ -69,20 +88,27 @@ if (buildCode !== 0) {
   process.exit(1);
 }
 
-console.log('▶ Starting preview on :4173 (test bundle)…');
+console.log(`▶ Starting preview on :${PORT} (test bundle)…`);
 await killPreview();
-const preview = spawn('npx', ['vite', 'preview', '--outDir', 'dist-test', '--port', '4173', '--strictPort'], {
+const preview = spawn('npx', ['vite', 'preview', '--outDir', 'dist-test', '--port', String(PORT), '--strictPort'], {
   cwd: appDir,
   shell: true,
   stdio: 'ignore',
   detached: process.platform !== 'win32'
 });
 preview.unref?.();
-const up = await waitForServer('http://localhost:4173/');
+const up = await waitForServer(BASE + '/');
 if (!up) {
   console.error('✗ preview never came up');
   process.exit(1);
 }
+const isolated = await verifyIsolatedBundle();
+if (!isolated) {
+  console.error('✗ served bundle does NOT contain the devtest_ prefix — aborting (won’t risk polluting production)');
+  await killPreview();
+  process.exit(1);
+}
+console.log('✓ confirmed: served bundle is the isolated devtest_ build');
 
 for (const suite of SUITES) {
   const t = Date.now();

@@ -3,7 +3,7 @@
 import puppeteer from 'puppeteer-core';
 
 const EDGE = process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const BASE = 'http://localhost:4173';
+const BASE = 'http://localhost:4174';
 
 const results = [];
 const ok = (name, pass, extra = '') => {

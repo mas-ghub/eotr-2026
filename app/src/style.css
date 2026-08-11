@@ -2224,10 +2224,6 @@ button[hidden] {
 .map-view {
   display: flex;
   flex-direction: column;
-  /* dvh is best, but fall back to vh on older iOS so the view can never
-     collapse to ~0 height (which made Leaflet render a partial-tile sliver). */
-  height: calc(100vh - var(--header-h) - var(--nav-h) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  height: calc(100dvh - var(--header-h) - var(--nav-h) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   padding-bottom: 0;
 }
 
@@ -2283,9 +2279,14 @@ button[hidden] {
 }
 
 .map-wrap {
-  flex: 1;
-  min-height: 220px;
+  /* Fixed, always-real height — NOT flex-based. Leaflet must never be created
+     in a ~0-height container or it renders a partial-tile sliver (the
+     "diagonal squares" seen on iOS). clamp keeps it usable on any screen. */
   position: relative;
+  flex: none;
+  height: clamp(320px, 56vh, 540px);
+  height: clamp(320px, 56dvh, 540px);
+  min-height: 320px;
   margin: 0 16px;
   border-radius: var(--radius);
   overflow: hidden;
@@ -2331,6 +2332,28 @@ button[hidden] {
 }
 
 .map-pop__msg {
+  width: 100%;
+}
+
+/* Confirm sheet when tapping an online name or marker to message someone */
+.map-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.map-ask p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.map-ask strong {
+  color: var(--ink);
+}
+
+.map-ask .btn {
   width: 100%;
 }
 

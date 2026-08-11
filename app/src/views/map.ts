@@ -1,7 +1,8 @@
-import { h, icon, toast } from '../ui';
+import { h, icon, toast, sheet } from '../ui';
 import { onViewCleanup } from '../lifecycle';
 import { navigate } from '../router';
 import { openDm, PENDING_CONV_KEY, currentUid } from '../chat';
+import { getName, promptForName } from '../greeting';
 import {
   presenceStart,
   onOnline,
@@ -112,26 +113,50 @@ export async function renderMap(): Promise<HTMLElement> {
   // ---- online list ----
   const renderOnline = (list: OnlineUser[]) => {
     onlineRow.innerHTML = '';
-    if (!list.length) {
-      onlineRow.appendChild(h('p', { class: 'map-online__empty' }, 'No one’s online right now.'));
+    // Never offer a DM to yourself (a stale presence doc for your own device
+    // would otherwise show as a tappable name and fail with a confusing toast).
+    const others = list.filter((u) => u.uid !== currentUid());
+    if (!others.length) {
+      onlineRow.appendChild(h('p', { class: 'map-online__empty' }, 'No one else is online right now.'));
       return;
     }
-    for (const u of list) {
+    for (const u of others) {
       const chip = h(
         'button',
         { class: 'map-online__chip', type: 'button', title: `Message ${u.name}` },
         h('span', { class: 'map-online__dot' }),
         h('span', {}, u.name)
       );
-      chip.addEventListener('click', () => void dmPerson(u.uid, u.name));
+      chip.addEventListener('click', () => void askMessage(u.uid, u.name));
       onlineRow.appendChild(chip);
     }
   };
 
+  /** Ask before opening a DM (so tapping a name isn't an accidental chat), and
+   *  make sure we have a name first so openDm can't silently fail. */
+  async function askMessage(uid: string, name: string) {
+    if (!getName()) {
+      const n = await promptForName();
+      if (!n) return; // user dismissed — no name, can't start a chat meaningfully
+    }
+    const body = h(
+      'div',
+      { class: 'map-ask' },
+      h('p', {}, `Open a private chat with <strong>${name}</strong>?`),
+      h('button', { class: 'btn btn-primary', type: 'button', html: `${icon('chat', 15)} Message ${name}` })
+    );
+    const closeSheet = sheet({ title: 'New chat', body });
+    const go = body.querySelector('button')!;
+    go.addEventListener('click', async () => {
+      closeSheet.close();
+      await dmPerson(uid, name);
+    });
+  }
+
   async function dmPerson(uid: string, name: string) {
     const conv = await openDm(uid, name);
     if (!conv) {
-      toast('Could not start a chat. Check your connection.', { type: 'error' });
+      toast('Couldn’t start a chat — check your connection and try again.', { type: 'error' });
       return;
     }
     try {
@@ -162,19 +187,43 @@ export async function renderMap(): Promise<HTMLElement> {
     // map — creating it at 0×0 is what produces the diagonal/partial tiles.
     const h = container.clientHeight;
     if (h < 10) return null;
-    map = L.map(container, { zoomControl: true, attributionControl: true });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const m = L.map(container, { zoomControl: true, attributionControl: true });
+    map = m;
+
+    // Primary tiles: OpenStreetMap. At a festival with flaky connectivity some
+    // devices can't reach it — watch for failures and swap to a reliable Esri
+    // provider so the map isn't a blank/partial grid.
+    const o = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-    map.setView(FESTIVAL_CENTER, FESTIVAL_ZOOM);
+    });
+    let loadedAny = false;
+    let errors = 0;
+    let swapped = false;
+    o.on('load', () => {
+      loadedAny = true;
+    });
+    o.on('tileerror', () => {
+      errors++;
+      if (!swapped && !loadedAny && errors >= 6) {
+        swapped = true;
+        o.remove();
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 18,
+          attribution: 'Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+        }).addTo(m);
+      }
+    });
+    o.addTo(m);
+
+    m.setView(FESTIVAL_CENTER, FESTIVAL_ZOOM);
     mapInitDone = true;
 
     // Re-measure whenever the container resizes (flex/layout settling after the
     // view transition, URL-bar show/hide on iOS, etc.).
     const invalidate = () => {
       try {
-        map?.invalidateSize(false);
+        m.invalidateSize(false);
       } catch {
         /* ignore */
       }
@@ -271,11 +320,26 @@ export async function renderMap(): Promise<HTMLElement> {
   }, 250);
   window.setTimeout(() => window.clearInterval(initRetry), 10000);
 
+  // Extra re-measures during the first ~3s: Android Chrome's View Transition
+  // can settle AFTER Leaflet's initial invalidates, leaving stale tile math.
+  // A short polling sweep is the most reliable way to force a correct re-render.
+  let sweep = 0;
+  const settleSweep = window.setInterval(() => {
+    try {
+      map?.invalidateSize(false);
+    } catch {
+      /* ignore */
+    }
+    if (++sweep >= 12) window.clearInterval(settleSweep);
+  }, 250);
+  window.setTimeout(() => window.clearInterval(settleSweep), 4000);
+
   onViewCleanup(() => {
     offOnline();
     offShare();
     offLocs();
     window.clearInterval(initRetry);
+    window.clearInterval(settleSweep);
     if (ro) ro.disconnect();
     if (onResize) window.removeEventListener('resize', onResize);
     if (map) {
