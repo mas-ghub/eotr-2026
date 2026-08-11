@@ -87,11 +87,19 @@ ok('map: B sees A online', bSeesA);
 const markerCountA = await A.page.evaluate(() => document.querySelectorAll('.leaflet-overlay-pane path').length).catch(() => 0);
 ok('map: A has markers on the map', markerCountA >= 2, `${markerCountA} markers`);
 
-// Tap B's chip -> opens a DM conversation (A -> B)
+// Tap B's chip -> a confirm sheet appears -> confirm -> DM opens (A -> B)
 await A.page.evaluate((t) => {
   const chip = [...document.querySelectorAll('.map-online__chip')].find((c) => c.textContent.includes(`MapB${t}`));
   chip?.click();
 }, tag);
+await sleep(1200);
+const sheetShown = await A.page.$eval('.sheet-overlay.open', (el) => !!el).catch(() => false);
+ok('map: tapping a name shows a confirm sheet', sheetShown);
+
+await A.page.evaluate(() => {
+  const btn = document.querySelector('.map-ask .btn');
+  btn?.click();
+});
 await sleep(2500);
 const onChatConv = await A.page.$eval('.chat-title--conv', (el, t) => el.textContent.includes(`MapB${t}`), tag).catch(() => false);
 ok('map: tapping an online chip starts a DM', onChatConv);

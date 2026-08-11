@@ -68,10 +68,22 @@ async function killPreview() {
 async function verifyIsolatedBundle() {
   try {
     const html = await (await fetch(BASE + '/')).text();
-    const js = html.match(/src="([^"]+\.js)"/);
-    if (!js) return false;
-    const code = await (await fetch(BASE + js[1])).text();
-    return code.includes('devtest_');
+    const jsFiles = [...html.matchAll(/src="([^"]+\.js)"/g)].map((m) => m[1]);
+    if (!jsFiles.length) return false;
+    // Normalize './assets/x.js' to '/assets/x.js' for the fetch.
+    const norm = (p) => (p.startsWith('/') ? p : '/' + p.replace(/^\.\//, ''));
+    const entry = await (await fetch(BASE + norm(jsFiles[0]))).text();
+    if (entry.includes('devtest_')) return true;
+    // Some builds keep the prefix in a dynamic chunk — scan referenced chunks.
+    for (const c of [...entry.matchAll(/["']\.?\/?assets\/([^"']+\.js)["']/g)].map((m) => m[1])) {
+      try {
+        const chunk = await (await fetch(BASE + norm('assets/' + c))).text();
+        if (chunk.includes('devtest_')) return true;
+      } catch {
+        /* keep scanning */
+      }
+    }
+    return false;
   } catch {
     return false;
   }
