@@ -1,6 +1,6 @@
 # End of the Road 2026 PWA — Project State
 
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-11_
 
 Unofficial fan project for **End of the Road 2026** (Larmer Tree Gardens, 3–6 Sept 2026).
 Offline-first PWA: lineup, clashfinder-style timetable, "My Day" schedule, print, and
@@ -18,6 +18,7 @@ offline 20s audio previews per artist.
 | `src/router.ts` | Hash router (`#/lineup`, `#/timetable`, `#/myday`, `#/artist/<slug>`, `#/print/…`) |
 | `src/data.ts` | Loads `data/meta.json` + `data/acts.json` + `data/artists.json` (single cache) |
 | `src/store.ts` | "My Day" schedule store (localStorage) |
+| `src/theme.ts` | Dark/light theme: `data-theme` on `<html>`, persisted choice, system-pref fallback |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -293,6 +294,27 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
   shuffle, ticket.
 - SW bumped to `eotr2026-v1.7.0`; smoke suite still 23/23; all features verified in a headless
   browser with zero console errors.
+
+## 11. Dark mode + timetable day persistence (2026-08-11)
+
+- **Dark mode** (`app/src/theme.ts`, new): header moon/sun toggle button in `main.ts`.
+  - Theme is applied as `data-theme` on `<html>`; choice persists in localStorage
+    (`eotr2026.theme.v1`); when the user hasn't chosen, it follows `prefers-color-scheme` live.
+  - `style.css` gained a `[data-theme='dark']` variable override block + a few new base
+    variables (`--header-bg`, `--nav-bg`, `--ghost-hover-bg`, `--imgwrap-bg`, `--shimmer`,
+    `--partial-ink`) so the hardcoded cream `rgba(246,241,231,·)` glass backgrounds and the
+    `#ece4d4` image placeholder swap too. `color-scheme` follows the theme so scrollbars/form
+    controls match. Body/header/nav get a 0.25s background transition for a smooth flip.
+  - The `theme-color` meta is updated at runtime to match (`#f6f1e7` light / `#141a16` dark).
+  - Print styles keep hardcoded light colours inside `@media print` — printing is always light.
+  - `initTheme()` runs first thing in `boot()` so dark-mode users never see a light flash.
+- **Timetable day persistence** (`app/src/views/timetable.ts`): the active day tab is saved to
+  localStorage (`eotr2026.ttday.v1`) and restored on render, so the timetable no longer resets
+  to Thursday every time you navigate away and back. Falls back to the first day if the saved
+  key no longer exists in `meta.days`.
+- SW bumped to `eotr2026-v1.8.0`. Smoke suite still **23/23**; new feature suite
+  `test/feature-check.mjs` **7/7** (toggle flips + persists across reload, body bg matches theme,
+  day persists across navigation, zero console errors). Deployed to GitHub Pages.
 
 ## 9. Updating set times / the timetable (data refresh)
 
