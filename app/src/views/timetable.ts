@@ -11,6 +11,7 @@ const RANGE_START = 9 * 60; // 09:00
 const RANGE_END = 27 * 60; // 03:00 next morning
 const ROW_H = 56;
 const STAGE_W = 118;
+const DAY_KEY = 'eotr2026.ttday.v1';
 
 function festivalNowMinutes(): { minutes: number; dayKey: string } | null {
   try {
@@ -84,7 +85,15 @@ function buildAct(act: Act): HTMLElement {
 
 export async function renderTimetable(): Promise<HTMLElement> {
   const { meta, acts } = await loadData();
+  // Remember which day the user was looking at so the timetable doesn't
+  // reset to the first day every time they navigate away and back.
   let selected = meta.days[0].key;
+  try {
+    const saved = localStorage.getItem(DAY_KEY);
+    if (saved && meta.days.some((d) => d.key === saved)) selected = saved;
+  } catch {
+    /* storage unavailable — start on the first day */
+  }
   const now = festivalNowMinutes();
 
   const root = h('div', { class: 'view tt-view' });
@@ -165,6 +174,11 @@ export async function renderTimetable(): Promise<HTMLElement> {
   tabs.querySelectorAll('.tt-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       selected = (tab as HTMLElement).dataset.day!;
+      try {
+        localStorage.setItem(DAY_KEY, selected);
+      } catch {
+        /* storage unavailable */
+      }
       tabs.querySelectorAll('.tt-tab').forEach((t) => t.classList.toggle('active', t === tab));
       renderDay();
     });

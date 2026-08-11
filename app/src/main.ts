@@ -6,6 +6,7 @@ import { schedule } from './store';
 import { player } from './audio';
 import { offline, fmtBytes, type OfflineStatus } from './offline';
 import { h, icon, toast, sheet } from './ui';
+import { initTheme, toggleTheme, currentTheme } from './theme';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
 import { renderSchedule } from './views/schedule';
@@ -155,11 +156,25 @@ function buildShell(updated: string) {
   const helpBtn = h('button', { class: 'header-help', type: 'button', 'aria-label': 'Help', title: 'Help: install, uninstall, offline audio', html: icon('help', 18) });
   helpBtn.addEventListener('click', openHelp);
 
+  const themeBtn = h('button', {
+    class: 'header-help theme-toggle',
+    type: 'button',
+    'aria-label': currentTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode',
+    title: 'Toggle dark / light mode',
+    html: icon(currentTheme() === 'dark' ? 'sun' : 'moon', 18)
+  });
+  themeBtn.addEventListener('click', () => {
+    const t = toggleTheme();
+    themeBtn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon', 18);
+    themeBtn.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  });
+
   const header = h(
     'header',
     { class: 'app-header' },
     h('a', { class: 'brand', href: '#/lineup' }, h('span', { class: 'brand__mark' }, 'EOTR'), h('span', { class: 'brand__year' }, '2026')),
     buildOfflinePill(),
+    themeBtn,
     helpBtn,
     h('button', { id: 'installBtn', class: 'btn btn-ghost small install-btn', type: 'button', hidden: true, html: `${icon('download', 14)} Install` })
   );
@@ -259,6 +274,7 @@ async function renderRoute(route: Route) {
 }
 
 async function boot() {
+  initTheme();
   registerServiceWorker();
   installPrompt();
   maybeIosHint();

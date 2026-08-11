@@ -1,6 +1,7 @@
 /* ============ End of the Road 2026 — design system ============ */
 
 :root {
+  color-scheme: light;
   --bg: #f6f1e7;
   --bg-2: #efe6d4;
   --card: #fffdf7;
@@ -18,8 +19,40 @@
   --radius: 16px;
   --header-h: 52px;
   --nav-h: 62px;
+  --header-bg: rgba(246, 241, 231, 0.88);
+  --nav-bg: rgba(246, 241, 231, 0.92);
+  --ghost-hover-bg: rgba(255, 255, 255, 0.5);
+  --imgwrap-bg: #ece4d4;
+  --shimmer: rgba(255, 255, 255, 0.55);
+  --partial-ink: #8a6d1a;
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ============ Dark theme ============ */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #141a16;
+  --bg-2: #1d2621;
+  --card: #202b25;
+  --ink: #eae3d3;
+  --ink-soft: #b6c0b5;
+  --muted: #8b968d;
+  --line: #2f3a33;
+  --accent: #f3703d;
+  --accent-2: #e3b64c;
+  --pink: #f08aa4;
+  --green: #58a37e;
+  --deep: #0a1410;
+  --danger: #e0604f;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --header-bg: rgba(20, 26, 22, 0.88);
+  --nav-bg: rgba(20, 26, 22, 0.92);
+  --ghost-hover-bg: rgba(255, 255, 255, 0.08);
+  --imgwrap-bg: #1a231e;
+  --shimmer: rgba(255, 255, 255, 0.07);
+  --partial-ink: #e0bd57;
 }
 
 * {
@@ -40,6 +73,7 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 img {
@@ -82,10 +116,11 @@ button {
   padding-bottom: 0;
   padding-left: 16px;
   padding-right: 16px;
-  background: rgba(246, 241, 231, 0.88);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .brand {
@@ -181,7 +216,7 @@ button {
 
 .offline-pill.partial {
   border-color: var(--accent-2);
-  color: #8a6d1a;
+  color: var(--partial-ink);
 }
 
 .offline-pill.error {
@@ -257,10 +292,11 @@ button {
   display: flex;
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(246, 241, 231, 0.92);
+  background: var(--nav-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .app-nav__tab {
@@ -373,7 +409,7 @@ button[hidden] {
 
 .btn-ghost:hover {
   border-color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--ghost-hover-bg);
 }
 
 .btn.danger {
@@ -815,7 +851,7 @@ button[hidden] {
 .imgwrap {
   position: relative;
   overflow: hidden;
-  background: #ece4d4;
+  background: var(--imgwrap-bg);
 }
 
 .imgwrap__img {
@@ -837,7 +873,7 @@ button[hidden] {
 .imgwrap__shimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background: linear-gradient(100deg, transparent 30%, var(--shimmer) 50%, transparent 70%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
