@@ -2,7 +2,7 @@
  * Bump CACHE_VERSION whenever the app or the festival data changes so clients
  * download fresh copies.
  */
-const CACHE_VERSION = 'eotr2026-v1.9.0';
+const CACHE_VERSION = 'eotr2026-v1.10.0';
 const APP_CACHE = `app-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 // The page downloads all clips into this cache with progress UI, so offline

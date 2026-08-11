@@ -20,6 +20,8 @@ offline 20s audio previews per artist.
 | `src/store.ts` | "My Day" schedule store (localStorage) |
 | `src/theme.ts` | Dark/light theme: `data-theme` on `<html>`, persisted choice, system-pref fallback |
 | `src/greeting.ts` | Name greeting: first-launch welcome prompt, time-of-day hero pill, localStorage name |
+| `src/chat.ts` | Firebase chat engine: lazy Firestore init (code-split), realtime wall, unread badge, Web Audio chime |
+| `src/views/chat.ts` | `#/chat` view: message bubbles, composer ("Posting as …"), status pill, not-configured state |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -335,6 +337,38 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
   live multi-user chat (backend, online-only, with a notification sound) — see `plan.md` Phase 2.
 - SW bumped to `eotr2026-v1.9.0`. Smoke **23/23**, feature **7/7**, new greeting suite
   `test/greeting-check.mjs` **9/9**. Deployed to GitHub Pages.
+
+## 13. Live chat / guestbook via Firebase (2026-08-11)
+
+- **Backend**: Firebase Cloud Firestore (SDK **12.17.1** — latest stable, verified on npm
+  2026-08-11). One shared `messages` collection for the whole festival — "message each other or all".
+  Config comes from Vite env vars (`app/.env`, gitignored; `app/.env.example` committed).
+  `firestore.rules` (repo root) is the security model: anyone may read + create, updates/deletes
+  forbidden, name/text size-capped. Public web keys are not secrets; rules are the protection.
+- **`src/chat.ts`** (new): lazy, idempotent Firestore init via **dynamic import** — the Firebase
+  chunks (~460 KB raw / ~135 KB gzip) are only fetched when the app is *configured*; with no
+  `.env` the app never downloads them (verified: main bundle has zero firebase code, 61 KB).
+  Exposes a realtime message store (`onSnapshot`, `orderBy ts asc`, `limitToLast(50)`), status
+  stream (connecting/online/offline/error/not-configured), `sendMessage` (server timestamps),
+  unread tracking (localStorage `eotr2026.chat.seen.v1`), and a Web Audio two-note chime
+  (`playChatSound`) synthesized with zero asset files.
+- **`src/views/chat.ts`** (new): `#/chat` route. Flex-column layout sized to the viewport
+  (`100dvh − header − nav`) with an inner scrolling wall, chat bubbles (own = green/right),
+  relative timestamps ticking every 30 s, auto-scroll near-bottom, and a composer that reuses the
+  saved greeting name ("Posting as Sam", tap to change; "Set your name to post" if unset). Status
+  pill shows Live/Connecting/Offline/Connection issue/Chat is coming soon.
+- **`main.ts`**: Chat nav tab (4 tabs) with a green unread badge (`onUnread`); new-message toast +
+  chime app-wide whenever a message arrives while the user isn't on the Chat page (never on first
+  load, never for your own messages); audio unlocked on the first user gesture (autoplay policy).
+- **Regression fixed en route**: the bottom-nav active highlight was comparing `href="#/lineup"`
+  against `route.name` (`lineup`) — never matched, so no tab ever appeared active. Now compares
+  `dataset.route` (artist pages keep Lineup highlighted). Covered by `chat-check.mjs`.
+- **Not configured yet**: app ships in a graceful "Chat is coming soon" state. One-time setup for
+  the user (console → project → web app → enable Firestore → publish `firestore.rules` → fill
+  `app/.env` → `node app/scripts/verify-chat.mjs` → rebuild + deploy). See `plan.md` §4.
+- **Status**: SW bumped to `eotr2026-v1.10.0`. New suite `test/chat-check.mjs` **9/9**; smoke
+  **23/23**, feature **7/7**, greeting **9/9**. `app/scripts/verify-chat.mjs` validates keys via a
+  zero-dependency Firestore REST call.
 
 ## 9. Updating set times / the timetable (data refresh)
 

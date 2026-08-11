@@ -7,16 +7,20 @@ import { player } from './audio';
 import { offline, fmtBytes, type OfflineStatus } from './offline';
 import { h, icon, toast, sheet } from './ui';
 import { initTheme, toggleTheme, currentTheme } from './theme';
-import { maybePromptName } from './greeting';
+import { maybePromptName, getName } from './greeting';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
 import { renderSchedule } from './views/schedule';
 import { renderArtist } from './views/artist';
 import { renderPrint } from './views/print';
+import { renderChat } from './views/chat';
+import { chatStart, onUnread, onChatMessages, unlockAudio, playChatSound } from './chat';
 
 let appRoot: HTMLElement;
 let mainEl: HTMLElement;
 let navBadge: HTMLElement;
+let chatBadge: HTMLElement;
+let lastMsgSignature = '';
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -190,21 +194,19 @@ function buildShell(updated: string) {
   );
 
   const tabs = h('nav', { class: 'app-nav' });
+  navBadge = h('span', { class: 'app-nav__badge', 'aria-label': 'Saved sets' });
+  chatBadge = h('span', { class: 'app-nav__badge chat-badge', 'aria-label': 'New chat messages' });
   const tabsDef = [
     { route: '#/lineup', label: 'Lineup', icon: 'list' },
     { route: '#/timetable', label: 'Timetable', icon: 'clock' },
-    { route: '#/myday', label: 'My Day', icon: 'heart' }
+    { route: '#/myday', label: 'My Day', icon: 'heart', badge: () => navBadge },
+    { route: '#/chat', label: 'Chat', icon: 'chat', badge: () => chatBadge }
   ];
   for (const t of tabsDef) {
-    tabs.appendChild(
-      h('a', { class: 'app-nav__tab', href: t.route, dataset: { route: t.route }, html: `${icon(t.icon, 22)}<span>${t.label}</span>` })
-    );
+    const tab = h('a', { class: 'app-nav__tab', href: t.route, dataset: { route: t.route }, html: `${icon(t.icon, 22)}<span>${t.label}</span>` });
+    if (t.badge) tab.appendChild(t.badge());
+    tabs.appendChild(tab);
   }
-  navBadge = h('span', { class: 'app-nav__badge' });
-  tabs.appendChild(navBadge);
-
-  appRoot = h('div', { class: 'app-root' }, header, mainEl, footer, tabs);
-  document.body.appendChild(appRoot);
 
   const refreshBadge = () => {
     const n = schedule.all().length;
@@ -213,6 +215,15 @@ function buildShell(updated: string) {
   };
   schedule.subscribe(refreshBadge);
   refreshBadge();
+
+  const refreshChatBadge = (n: number) => {
+    chatBadge.textContent = n ? String(n) : '';
+    chatBadge.classList.toggle('show', n > 0);
+  };
+  onUnread(refreshChatBadge);
+
+  appRoot = h('div', { class: 'app-root' }, header, mainEl, footer, tabs);
+  document.body.appendChild(appRoot);
 }
 
 async function renderRoute(route: Route) {
@@ -233,6 +244,9 @@ async function renderRoute(route: Route) {
         break;
       case 'myday':
         view = await renderSchedule();
+        break;
+      case 'chat':
+        view = await renderChat();
         break;
       case 'artist':
         view = await renderArtist(route.slug || '');
@@ -269,9 +283,44 @@ async function renderRoute(route: Route) {
   else swap();
 
   document.querySelectorAll('.app-nav__tab').forEach((t) => {
-    const active = t.getAttribute('href') === route.name || (route.name === 'artist' && t.getAttribute('href') === '#/lineup');
-    t.classList.toggle('active', active);
+    // artist pages keep the Lineup tab highlighted; everything else matches its route.
+    const activeHref = route.name === 'artist' ? '#/lineup' : `#/${route.name}`;
+    t.classList.toggle('active', (t as HTMLElement).dataset.route === activeHref);
   });
+}
+
+/** Pop a toast + chime when a NEW message arrives while the user isn't on the chat page. */
+function wireChatNotifications() {
+  chatStart();
+  onChatMessages((msgs) => {
+    if (!msgs.length) return;
+    const last = msgs[msgs.length - 1];
+    const sig = `${last.id}:${last.ts}`;
+    if (sig === lastMsgSignature) return;
+    const isFirstLoad = lastMsgSignature === '';
+    lastMsgSignature = sig;
+    // Never toast on the first load (that would greet users with stale messages).
+    if (!isFirstLoad && currentRoute.name !== 'chat') {
+      const isMine = getName()?.toLowerCase() === last.name.toLowerCase();
+      if (!isMine) {
+        playChatSound();
+        toast(`New message from ${last.name}`, { type: 'info', ms: 3200 });
+      }
+    }
+  });
+}
+
+/** Browsers block audio until the first user gesture — unlock it then. */
+function unlockAudioOnGesture() {
+  const unlock = () => {
+    unlockAudio();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('touchstart', unlock);
 }
 
 async function boot() {
@@ -280,6 +329,8 @@ async function boot() {
   installPrompt();
   maybeIosHint();
   maybePromptName();
+  wireChatNotifications();
+  unlockAudioOnGesture();
   void offline.init();
 
   try {

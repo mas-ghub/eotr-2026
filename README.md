@@ -13,7 +13,24 @@ An offline-first Progressive Web App for **End of the Road 2026** (Larmer Tree G
 - **My Day** — your personal schedule, grouped by day, time-sorted, with clash warnings. Add / remove / print.
 - **Get a feel** — 30-second previews for ~135 artists (Deezer). The top 2 tracks per artist are bundled **inside the app** as trimmed 20s clips, so they play offline forever. Extract and save your own 10–20s clips in the browser and keep them offline.
 - **Print** — print the full programme or your personal schedule with a clean print stylesheet.
+- **Chat / guestbook** — one shared message wall for everyone at the festival. New messages pop up app-wide with a soft chime (sound + toast) and a badge on the Chat tab. Online only.
 - **Offline PWA** — installable on iPhone/Android/desktop; works with no connection after first visit (service worker caches the shell, data, fonts, images and audio).
+
+## Chat setup (one-time, ~10 minutes)
+
+The chat is powered by **Firebase Cloud Firestore** (free Spark plan). The app ships in a
+graceful "Chat is coming soon" state until you connect it.
+
+1. Go to **https://console.firebase.google.com** → **Add project** → name it (e.g. `eotr-2026-chat`). Google Analytics can be skipped.
+2. On the project overview, click the **Web** icon (`</>`) → register an app (nickname e.g. `eotr-2026`) → copy the `firebaseConfig` values.
+3. In the left menu open **Build → Firestore Database → Create database** → choose *Production mode* and a location (e.g. `europe-west2`).
+4. Open **Rules**, replace the contents with the file **`firestore.rules`** in this repo, then **Publish**.
+5. Copy **`app/.env.example`** to **`app/.env`** and paste your `VITE_FIREBASE_*` values into it.
+6. Verify with `node app/scripts/verify-chat.mjs` (expect `PASS`), then `npm run build` and redeploy.
+
+The Firebase web keys are **public by design** (they ship in the app) — the `firestore.rules`
+file is what actually protects the data: anyone can read or post, but nothing can be edited or
+deleted, and messages are size-capped.
 
 ## Tech
 

@@ -6,21 +6,23 @@ _Written end of day 2026-08-10. Updated 2026-08-11 (dark mode + timetable fix + 
 
 ## 1. Where we are (all done, tested, LIVE)
 
-Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.9.0**, repo `mas-ghub/eotr-2026` (public).
+Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.10.0**, repo `mas-ghub/eotr-2026` (public).
 
 **Working, verified, deployed:**
 
 - Lineup, Timetable (with fixed 09:00→02:00 hour labels), My Day schedule + clash flags, artist pages, film/Cinema, print views.
-- **Name greeting (new)**: on first open a spring-animated welcome card asks for a first name → the Lineup hero shows a tappable time-of-day pill ("Good morning, Sam — enjoy the festival", Europe/London). Name is sanitised (XSS-safe), stored on-device only, editable by tapping the pill. No image/avatar, no uniqueness check yet (both deferred by the user).
-- **Dark mode** (new): moon/sun toggle in the header — persists to localStorage, falls back to the OS preference, keeps the status-bar theme-color in sync, transitions smoothly. Works offline, no flash on cold start.
-- **Timetable remembers its day** (new): the selected day tab now persists across navigation (localStorage `eotr2026.ttday.v1`) — no more resetting to Thursday every visit.
-- Audio: 684 bundled offline clips (655 music + 29 film trailers). Correct-artist audio + correct links (DJ Crenshaw/Sunil Patel festival-link leak fixed; WARBY/Spanish Horses/DJ Crenshaw/Rose of Nevada correctly show "no previews" empty state).
-- Offline: tap "Get offline audio" pill → downloads all clips → "Offline ready ✓". SW white-screen bug fixed (precache hashed bundles, keep clips cache across updates). Pill shows "Offline mode" when disconnected.
-- Header: offline pill + dark toggle + "?" help sheet (install/uninstall/offline). Install button Android-only (hidden on iOS).
-- Audio player: 5-bar equalizer inside play button, live progress bar + timer, single-track exclusivity (only one row animates).
-- Festival-fun: weather strip on Timetable + My Day (Open-Meteo, no key), festival countdown on My Day, "See them live" Songkick chip (hidden offline), "Surprise me" shuffle chip, version footer.
+- **Chat / guestbook (new)** — a shared message wall for everyone at the festival, built on Firebase Firestore. New messages pop up app-wide with a soft chime + toast and a green badge on the Chat tab. Online only (Firestore needs a connection). **Still shows "Chat is coming soon" until the Firebase setup in §4 is done.**
+- **Name greeting**: first-launch welcome card → tappable time-of-day hero pill ("Good morning, Sam — enjoy the festival"). The chat composer reuses the stored name ("Posting as Sam", tap to change).
+- **Dark mode**: moon/sun toggle in the header — persists, follows OS until chosen, syncs status-bar theme-color, works offline.
+- **Timetable remembers its day** across navigation.
+- **Nav active-tab highlight fixed** (was comparing `#/lineup` to `lineup` — never highlighted; now `dataset.route`).
+- Audio: 684 bundled offline clips (655 music + 29 film trailers), correct-artist audio + links.
+- Offline: "Get offline audio" pill → downloads all clips → "Offline ready ✓"; white-screen bug fixed; pill shows "Offline mode" when disconnected.
+- Header: offline pill + dark toggle + "?" help sheet. Install button Android-only.
+- Audio player: 5-bar equalizer, progress bar + timer, single-track exclusivity.
+- Festival-fun: weather strip, countdown, "See them live" (Songkick), "Surprise me", version footer.
 
-**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke suite `test/smoke.mjs` **23/23** · feature suite `test/feature-check.mjs` **7/7** (dark toggle/persist + timetable day persist) · greeting suite `test/greeting-check.mjs` **9/9** · zero console errors in headless browser checks.
+**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke **23/23** · feature (dark/day) **7/7** · greeting **9/9** · chat (not-configured state) **9/9** · zero console errors.
 
 ---
 
@@ -33,6 +35,8 @@ npm run preview             # serve app/dist → http://localhost:4173
 node test/smoke.mjs         # run smoke suite (needs preview running on :4173 first)
 node test/feature-check.mjs # dark mode + timetable day persistence (also needs :4173)
 node test/greeting-check.mjs # name greeting prompt/pill (also needs :4173)
+node test/chat-check.mjs    # chat tab/view + not-configured state (also needs :4173)
+node app/scripts/verify-chat.mjs # validates Firebase keys in app/.env once set up
 npm --prefix scraper run clips -- --films   # full re-scrape incl. film trailers (needs ffmpeg + yt-dlp)
 node scraper/src/rebundle-one.mjs <slug>    # re-bundle one artist's audio (after adding an override)
 ```
@@ -60,12 +64,32 @@ curl -s "https://mas-ghub.github.io/eotr-2026/sw.js" | grep CACHE_VERSION
 
 ## 4. Ideas queued (Phase 2 — additive only, same style)
 
-- **Live multi-user chat / guestbook** (NEXT — user requested): "message each other or all", popping up with a **sound** on the phone, **online-only**. The static site needs a free backend — Firebase (Firestore + messaging) or Supabase/Cloudflare Worker. Plan: Firebase Firestore collection of messages (name, text, ts), a `#/chat` view + a global "new message" sound + badge. User already saved the name in localStorage (v1.9.0) so chat can prefill it. **Requires adding API keys** (env/secrets only — never commit) and deciding auth/abuse rules (the "no duplicate names" rule the user mentioned lives here too).
-- **Personal notes** on artists/sets (localStorage).
+### Chat setup — THE NEXT ACTION (one-time, ~10 min, needs the user's Google account)
+
+The chat feature is **built, tested and deployed** but sits in a graceful "Chat is coming soon"
+state until Firebase is connected. The user must do this (it needs their Google login):
+
+1. **console.firebase.google.com → Add project** (e.g. `eotr-2026-chat`; skip Analytics).
+2. Overview → **Web `</>`** → register an app (e.g. `eotr-2026`) → copy the `firebaseConfig`.
+3. **Build → Firestore Database → Create database** → *Production mode*, region `europe-west2`.
+4. **Rules** tab → paste the contents of **`firestore.rules`** (in this repo) → **Publish**.
+5. Copy **`app/.env.example`** → **`app/.env`** and paste the `VITE_FIREBASE_*` values.
+6. `node app/scripts/verify-chat.mjs` → expect `PASS`, then `npm run build` + redeploy
+   (`npx --yes gh-pages -d app/dist`). No SW bump needed for a data-only change? — **no, always
+   bump CACHE_VERSION** so devices pull the new bundle with the keys baked in.
+7. Verify on a phone: open Chat → set your name → send a message → a second device/incognito
+   sees it arrive with a chime + badge.
+
+The Firebase web keys are public by design; `firestore.rules` is the real protection
+(anyone can read/post, nothing editable/deletable, sizes capped).
+
+### Backlog (not started)
+
 - **Set reminders** — notification before a saved set starts (needs opt-in; iOS web notifications only on installed PWAs — flaky, test carefully).
+- **Personal notes** on artists/sets (localStorage).
+- **Chat hardening** (after the wall is live): name-uniqueness rule (query a `names` collection on create), Firebase App Check (reCAPTCHA) to block spam/bots, moderation/delete path, maybe a per-user rate limit via Cloud Functions.
 - Consider **auto-deploy GitHub Action** (push to main → build → deploy to gh-pages) so future updates are one `git push`.
 - When we're closer (within ~16 days): weather strip switches to live forecast automatically — no action needed. Set times will change → re-run scraper + deploy.
-- Backlog (explicitly deferred by user): avatar/image in the profile popup; "name must be unique" check.
 
 ---
 
@@ -81,6 +105,6 @@ curl -s "https://mas-ghub.github.io/eotr-2026/sw.js" | grep CACHE_VERSION
 
 ## 6. First thing tomorrow if resuming
 
-1. `git status` should be clean. Confirm live SW is v1.9.0.
-2. Run `npm run dev`, spot-check: name greeting prompt on a fresh profile (clear localStorage), dark-mode toggle (persists), timetable day persistence, lineup/timetable/myday/artist + weather strip + countdown.
-3. Then start the live multi-user chat (Phase 2 list): pick Firebase vs Supabase/Worker, add keys via env only, build `#/chat` + new-message sound.
+1. `git status` should be clean. Confirm live SW is v1.10.0.
+2. Run `npm run dev`, spot-check: chat tab → "Chat is coming soon", greeting prompt on fresh profile, dark toggle, timetable day persistence.
+3. **Complete the Firebase chat setup** (§4) with the user — the code is done, only the account-side steps + `.env` remain, then rebuild + redeploy and verify two devices can chat.
