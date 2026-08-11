@@ -408,7 +408,26 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
   (wall + DM cross-device + privacy), `test/chat-e2e-live.mjs` **10/10** (against the deployed
   site), `test/group-e2e.mjs` **7/7** (3-device group). Full regression green: smoke **23/23**,
   feature **7/7**, greeting **9/9**, chat-check **9/9**. Deployed to GitHub Pages.
-## 9. Updating set times / the timetable (data refresh)
+
+## 15. Unique display names (2026-08-11)
+
+- **Problem**: each anonymous device has a unique uid but people could pick the same display
+  name, so DMs/pick names could point at the wrong person.
+- **Fix**: a Firestore **`names`** collection enforces first-come-first-served uniqueness.
+  Doc id = lowercased name; fields `{ name, uid, ts }`. Rules: read any, create only when the
+  name is free and `uid == request.auth.uid` (atomic), update only for the owner, no delete.
+- **`src/chat.ts` → `claimName()`**: `getDoc` to check, then `setDoc`; the create's atomicity
+  covers the race (a concurrent claim makes one of them fail). Returns
+  `'ok' | 'taken' | 'unavailable'` — `unavailable` (offline / rules not published) still
+  accepts the name locally so a guestbook message is never blocked.
+- **`src/greeting.ts`**: the welcome prompt's submit is now async — it shows a "Checking…"
+  button state, calls `claimName`, and on `'taken'` shows
+  `"X is already taken — try another ✨"` and blocks saving. Same path when changing names via
+  the hero pill.
+- **Status**: SW bumped to `eotr2026-v1.13.0`. New suites `test/name-unique-check.mjs` **6/6**
+  (local) and `test/name-unique-live.mjs` **6/6** (deployed site): claim, taken rejection with
+  no save, fallback acceptance. greeting-check updated for permanent claims (**9/9**), DM e2e
+  **10/10**, group e2e **7/7** still green. Deployed to GitHub Pages.
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
   Clashfinder). They are NOT fetched live by the PWA.
