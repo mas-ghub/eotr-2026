@@ -1,11 +1,28 @@
 import type { FirebaseApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
+import type { Auth, User } from 'firebase/auth';
+
+// ====================================================================
+// Types
+// ====================================================================
 
 export interface ChatMessage {
   id: string;
   name: string;
   text: string;
   ts: number; // epoch millis
+  senderId?: string;
+}
+
+export interface Conversation {
+  id: string;
+  type: 'dm' | 'group';
+  participants: string[]; // uids
+  names: Record<string, string>; // uid -> display name
+  title?: string;
+  lastAt: number;
+  lastText: string;
+  createdBy: string;
 }
 
 export type ChatStatus =
@@ -15,10 +32,23 @@ export type ChatStatus =
   | { state: 'offline' }
   | { state: 'error'; message: string };
 
+export type AuthState = 'unknown' | 'ready' | 'failed';
+
+export interface IncomingNotice {
+  name: string;
+  source: 'wall' | 'dm' | 'group';
+}
+
+// ====================================================================
+// Constants
+// ====================================================================
+
 const MAX_MESSAGES = 50;
 const SEEN_KEY = 'eotr2026.chat.seen.v1';
+const CONV_SEEN_PREFIX = 'eotr2026.chat.seen.conv.v1.';
 const MSG_LIMIT = 280;
 const NAME_LIMIT = 24;
+const GROUP_MAX = 20;
 
 /** Returns the Firebase config from app/.env, or null if chat isn't set up yet. */
 function chatConfig(): Record<string, string> | null {
@@ -35,18 +65,38 @@ function chatConfig(): Record<string, string> | null {
   };
 }
 
+// ====================================================================
+// State
+// ====================================================================
+
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
-let unsub: (() => void) | null = null;
+let auth: Auth | null = null;
+let myUid: string | null = null;
+let authState: AuthState = 'unknown';
+let unsubWall: (() => void) | null = null;
+let unsubConvs: (() => void) | null = null;
 let started = false;
-let messages: ChatMessage[] = [];
 let online = navigator.onLine;
+
+let messages: ChatMessage[] = [];
+let convs: Conversation[] = [];
 
 const msgListeners = new Set<(msgs: ChatMessage[]) => void>();
 const statusListeners = new Set<(s: ChatStatus) => void>();
 const unreadListeners = new Set<(n: number) => void>();
+const authListeners = new Set<(s: AuthState) => void>();
+const convListeners = new Set<(list: Conversation[]) => void>();
+const incomingListeners = new Set<(n: IncomingNotice) => void>();
 
 let lastStatus: ChatStatus = chatConfig() ? { state: online ? 'connecting' : 'offline' } : { state: 'not-configured' };
+
+let wallSig = '';
+const convSig = new Map<string, string>();
+
+// ====================================================================
+// Emitters
+// ====================================================================
 
 function emitMessages() {
   msgListeners.forEach((fn) => fn([...messages]));
@@ -55,9 +105,23 @@ function setStatus(s: ChatStatus) {
   lastStatus = s;
   statusListeners.forEach((fn) => fn(s));
 }
-function emitUnread() {
-  unreadListeners.forEach((fn) => fn(unreadCount()));
+function setAuthState(s: AuthState) {
+  authState = s;
+  authListeners.forEach((fn) => fn(s));
 }
+function emitConvs() {
+  convListeners.forEach((fn) => fn([...convs]));
+}
+function emitUnread() {
+  unreadListeners.forEach((fn) => fn(unreadTotal()));
+}
+function emitIncoming(n: IncomingNotice) {
+  incomingListeners.forEach((fn) => fn(n));
+}
+
+// ====================================================================
+// Firebase bootstrap (lazy, code-split)
+// ====================================================================
 
 async function initFirestore(): Promise<Firestore | null> {
   if (db) return db;
@@ -75,6 +139,33 @@ async function initFirestore(): Promise<Firestore | null> {
   }
 }
 
+/** Restore or create the anonymous identity (same uid persists across reloads). */
+async function ensureAuth(): Promise<string | null> {
+  if (myUid) return myUid;
+  if (!app) return null;
+  try {
+    const { getAuth, onAuthStateChanged, signInAnonymously } = await import('firebase/auth');
+    auth = getAuth(app);
+    await new Promise<void>((resolve) => {
+      const un = onAuthStateChanged(auth!, () => {
+        un();
+        resolve();
+      });
+    });
+    let user: User | null = auth.currentUser;
+    if (!user) {
+      const cred = await signInAnonymously(auth);
+      user = cred.user;
+    }
+    myUid = user.uid;
+    setAuthState('ready');
+    return myUid;
+  } catch (err) {
+    setAuthState('failed');
+    return null;
+  }
+}
+
 function toMillis(v: unknown): number {
   if (v && typeof v === 'object' && typeof (v as { toMillis?: unknown }).toMillis === 'function') {
     return (v as { toMillis: () => number }).toMillis();
@@ -82,6 +173,126 @@ function toMillis(v: unknown): number {
   if (typeof v === 'number') return v;
   if (v instanceof Date) return v.getTime();
   return Date.now();
+}
+
+function mapWallDoc(id: string, data: { name?: unknown; text?: unknown; ts?: unknown; senderId?: unknown }): ChatMessage {
+  return {
+    id,
+    name: typeof data.name === 'string' ? data.name : '?',
+    text: typeof data.text === 'string' ? data.text : '',
+    ts: toMillis(data.ts),
+    senderId: typeof data.senderId === 'string' ? data.senderId : undefined
+  };
+}
+
+function mapConvDoc(id: string, data: Record<string, unknown>): Conversation {
+  const names: Record<string, string> = {};
+  const rawNames = data.names;
+  if (rawNames && typeof rawNames === 'object') {
+    for (const [k, v] of Object.entries(rawNames)) if (typeof v === 'string') names[k] = v;
+  }
+  const parts = Array.isArray(data.participants) ? data.participants.filter((p): p is string => typeof p === 'string') : [];
+  return {
+    id,
+    type: data.type === 'group' ? 'group' : 'dm',
+    participants: parts,
+    names,
+    title: typeof data.title === 'string' ? data.title : undefined,
+    lastAt: toMillis(data.lastAt),
+    lastText: typeof data.lastText === 'string' ? data.lastText : '',
+    createdBy: typeof data.createdBy === 'string' ? data.createdBy : ''
+  };
+}
+
+async function subscribeWall() {
+  if (!db || unsubWall) return;
+  const { collection, query, orderBy, limitToLast, onSnapshot } = await import('firebase/firestore');
+  const q = query(collection(db, 'messages'), orderBy('ts', 'asc'), limitToLast(MAX_MESSAGES));
+  unsubWall = onSnapshot(
+    q,
+    (snap) => {
+      messages = snap.docs.map((d) => mapWallDoc(d.id, d.data() as Parameters<typeof mapWallDoc>[1]));
+      setStatus({ state: 'online', count: messages.length });
+      emitMessages();
+      emitUnread();
+      const last = messages[messages.length - 1];
+      if (last) {
+        const sig = last.id;
+        if (wallSig && sig !== wallSig && last.senderId && last.senderId !== myUid) {
+          emitIncoming({ name: last.name, source: 'wall' });
+        }
+        wallSig = sig;
+      }
+    },
+    (err) => setStatus({ state: 'error', message: err.message || 'Could not load messages' })
+  );
+}
+
+async function subscribeConvs() {
+  if (!db || !myUid || unsubConvs) return;
+  try {
+    const { collection, query, where, onSnapshot } = await import('firebase/firestore');
+    const q = query(collection(db, 'conversations'), where('participants', 'array-contains', myUid));
+    unsubConvs = onSnapshot(
+      q,
+      (snap) => {
+        const seen = new Set<string>();
+        for (const d of snap.docs) {
+          const c = mapConvDoc(d.id, d.data() as Record<string, unknown>);
+          seen.add(c.id);
+          void ensureConvIncoming(c);
+        }
+        for (const [id, un] of convIncoming) {
+          if (!seen.has(id)) {
+            un();
+            convIncoming.delete(id);
+          }
+        }
+        convs = snap.docs
+          .map((d) => mapConvDoc(d.id, d.data() as Record<string, unknown>))
+          .sort((a, b) => b.lastAt - a.lastAt);
+        emitConvs();
+        emitUnread();
+      },
+      () => {
+        /* conversation list errors are non-fatal — wall still works */
+      }
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+const convIncoming = new Map<string, () => void>();
+
+/** Watch a conversation's newest message once, for the incoming-notification path. */
+async function ensureConvIncoming(c: Conversation) {
+  if (convIncoming.has(c.id) || !db) return;
+  try {
+    const { collection, query, orderBy, limitToLast, onSnapshot } = await import('firebase/firestore');
+    const q = query(collection(db, 'conversations', c.id, 'messages'), orderBy('ts', 'asc'), limitToLast(1));
+    const un = onSnapshot(
+      q,
+      (snap) => {
+        const last = snap.docs[snap.docs.length - 1];
+        if (!last) return;
+        const sig = last.id;
+        const prev = convSig.get(c.id);
+        const data = last.data() as { senderId?: unknown; name?: unknown };
+        const senderId = typeof data.senderId === 'string' ? data.senderId : undefined;
+        if (prev && sig !== prev && senderId && senderId !== myUid) {
+          emitIncoming({ name: typeof data.name === 'string' ? data.name : 'Someone', source: c.type });
+        }
+        convSig.set(c.id, sig);
+      },
+      () => {
+        /* ignore */
+      }
+    );
+    convIncoming.set(c.id, () => un());
+  } catch {
+    /* ignore */
+  }
 }
 
 async function start() {
@@ -102,44 +313,37 @@ async function start() {
   const firestore = await initFirestore();
   if (!firestore) return;
   setStatus({ state: 'connecting' });
-  try {
-    const { collection, query, orderBy, limitToLast, onSnapshot } = await import('firebase/firestore');
-    const q = query(collection(firestore, 'messages'), orderBy('ts', 'asc'), limitToLast(MAX_MESSAGES));
-    unsub = onSnapshot(
-      q,
-      (snap) => {
-        messages = snap.docs.map((d) => {
-          const data = d.data() as { name?: unknown; text?: unknown; ts?: unknown };
-          return {
-            id: d.id,
-            name: typeof data.name === 'string' ? data.name : '?',
-            text: typeof data.text === 'string' ? data.text : '',
-            ts: toMillis(data.ts)
-          };
-        });
-        setStatus({ state: 'online', count: messages.length });
-        emitMessages();
-        emitUnread();
-      },
-      (err) => setStatus({ state: 'error', message: err.message || 'Could not load messages' })
-    );
-  } catch (err) {
-    setStatus({ state: 'error', message: err instanceof Error ? err.message : 'Could not load messages' });
+  const uid = await ensureAuth();
+  if (!uid) {
+    // Still allow reading the wall even if anonymous auth failed (rules block writes).
+    setStatus({ state: 'online', count: messages.length });
+    void subscribeWall();
+    return;
   }
+  void subscribeWall();
+  void subscribeConvs();
 }
+
+// ====================================================================
+// Public API — lifecycle
+// ====================================================================
 
 /** Kick off the chat connection. Safe to call repeatedly; idempotent. */
 export function chatStart() {
   void start();
 }
 
-/** Stop listening (e.g. when leaving the chat view) but keep the connection. */
+/** Stop the wall listener (e.g. when leaving the chat view) but keep the connection. */
 export function chatStop() {
-  if (unsub) {
-    unsub();
-    unsub = null;
+  if (unsubWall) {
+    unsubWall();
+    unsubWall = null;
   }
 }
+
+// ====================================================================
+// Public API — state + subscriptions
+// ====================================================================
 
 export function chatMessages(): ChatMessage[] {
   return [...messages];
@@ -151,6 +355,14 @@ export function chatStatus(): ChatStatus {
 
 export function isConfigured(): boolean {
   return chatConfig() !== null;
+}
+
+export function currentUid(): string | null {
+  return myUid;
+}
+
+export function currentAuth(): AuthState {
+  return authState;
 }
 
 export function onChatMessages(fn: (msgs: ChatMessage[]) => void): () => void {
@@ -169,29 +381,232 @@ export function onChatStatus(fn: (s: ChatStatus) => void): () => void {
   };
 }
 
-/** Post a message. Returns false if chat isn't configured or the text is invalid. */
+export function onAuth(fn: (s: AuthState) => void): () => void {
+  authListeners.add(fn);
+  fn(authState);
+  return () => {
+    authListeners.delete(fn);
+  };
+}
+
+/** Fires for NEW messages that aren't yours (wall or private). Never on initial load. */
+export function onIncoming(fn: (n: IncomingNotice) => void): () => void {
+  incomingListeners.add(fn);
+  return () => {
+    incomingListeners.delete(fn);
+  };
+}
+
+export function conversations(): Conversation[] {
+  return [...convs];
+}
+
+export function onConversations(fn: (list: Conversation[]) => void): () => void {
+  convListeners.add(fn);
+  fn([...convs]);
+  return () => {
+    convListeners.delete(fn);
+  };
+}
+
+/** Subscribe to a specific conversation's messages. Returns an unsubscribe fn. */
+export function listenConversation(convId: string, fn: (msgs: ChatMessage[]) => void): () => void {
+  let unsub: (() => void) | null = null;
+  if (db) {
+    void (async () => {
+      const f = await import('firebase/firestore');
+      const q = f.query(f.collection(db!, 'conversations', convId, 'messages'), f.orderBy('ts', 'asc'), f.limitToLast(MAX_MESSAGES));
+      unsub = f.onSnapshot(
+        q,
+        (snap) => {
+          fn(snap.docs.map((d) => mapWallDoc(d.id, d.data() as Parameters<typeof mapWallDoc>[1])));
+        },
+        () => {
+          /* non-fatal */
+        }
+      );
+    })();
+  }
+  return () => {
+    unsub?.();
+  };
+}
+
+// ====================================================================
+// Public API — sending
+// ====================================================================
+
+/** Post a message to the public wall. Requires anonymous auth. */
 export async function sendMessage(name: string, text: string): Promise<boolean> {
   const clean = text.trim().slice(0, MSG_LIMIT);
   const who = name.trim().slice(0, NAME_LIMIT);
-  if (!clean || !who) return false;
+  if (!clean || !who || !myUid) return false;
   const firestore = await initFirestore();
   if (!firestore) return false;
   try {
     const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-    await addDoc(collection(firestore, 'messages'), { name: who, text: clean, ts: serverTimestamp() });
+    await addDoc(collection(firestore, 'messages'), { name: who, text: clean, ts: serverTimestamp(), senderId: myUid });
     return true;
   } catch {
     return false;
   }
 }
 
-// ---- unread tracking (badge) ----
+/** Open (or create) a DM with another user. Returns the conversation or null. */
+export async function openDm(otherUid: string, otherName: string): Promise<Conversation | null> {
+  const myName = currentName();
+  if (!myUid || !otherUid || otherUid === myUid || !myName) return null;
+  const firestore = await initFirestore();
+  if (!firestore) return null;
+  const sorted = [myUid, otherUid].sort();
+  const convId = `dm_${sorted[0]}_${sorted[1]}`;
+  try {
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    const ref = doc(firestore, 'conversations', convId);
+    // Merge upsert: creates if missing, otherwise preserves existing fields
+    // (e.g. the other participant's name). No getDoc — reading a doc that
+    // doesn't exist yet is denied by the read rule (resource is null).
+    await setDoc(ref, {
+      type: 'dm',
+      participants: sorted,
+      names: { [myUid]: myName, [otherUid]: otherName },
+      createdBy: myUid,
+      lastAt: serverTimestamp(),
+      lastText: ''
+    }, { merge: true });
+    return { id: convId, type: 'dm', participants: sorted, names: { [myUid]: myName, [otherUid]: otherName }, lastAt: Date.now(), lastText: '', createdBy: myUid };
+  } catch (err) {
+    console.error('[openDm] failed', err);
+    return null;
+  }
+}
+
+/** Create a group conversation. Returns the conversation or null. */
+export async function createGroup(title: string, members: Array<{ uid: string; name: string }>): Promise<Conversation | null> {
+  const myName = currentName();
+  if (!myUid || !myName) return null;
+  const clean = title.trim().slice(0, 40);
+  if (!clean) return null;
+  const unique = members.filter((m) => m.uid && m.uid !== myUid);
+  if (unique.length < 1) return null;
+  const people = [...unique.slice(0, GROUP_MAX - 1)];
+  const participants = [...people.map((p) => p.uid), myUid];
+  const names: Record<string, string> = { [myUid]: myName };
+  for (const p of people) names[p.uid] = p.name.slice(0, NAME_LIMIT);
+  const firestore = await initFirestore();
+  if (!firestore) return null;
+  const convId = `grp_${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.floor(Math.random() * 1e6)}`}`;
+  try {
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    await setDoc(doc(firestore, 'conversations', convId), {
+      type: 'group',
+      title: clean,
+      participants,
+      names,
+      createdBy: myUid,
+      lastAt: serverTimestamp(),
+      lastText: ''
+    });
+    return { id: convId, type: 'group', participants, names, title: clean, lastAt: Date.now(), lastText: '', createdBy: myUid };
+  } catch {
+    return null;
+  }
+}
+
+/** Send a message inside a conversation. */
+export async function sendConversationMessage(convId: string, name: string, text: string): Promise<boolean> {
+  const clean = text.trim().slice(0, MSG_LIMIT);
+  const who = name.trim().slice(0, NAME_LIMIT);
+  if (!clean || !who || !myUid) return false;
+  const firestore = await initFirestore();
+  if (!firestore) return false;
+  try {
+    const { collection, addDoc, serverTimestamp, updateDoc, doc } = await import('firebase/firestore');
+    await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
+      name: who,
+      text: clean,
+      ts: serverTimestamp(),
+      senderId: myUid
+    });
+    // Touch the conversation header so the Chats list reorders + previews.
+    await updateDoc(doc(firestore, 'conversations', convId), {
+      lastAt: serverTimestamp(),
+      lastText: clean,
+      [`names.${myUid}`]: who
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Display name from the greeting store, or the name we last used in chat. */
+function currentName(): string | null {
+  try {
+    const v = localStorage.getItem('eotr2026.name.v1');
+    if (v && v.trim()) return v.trim();
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** People we know about (from the wall + conversations), for the picker.
+ *  Dedupes by display name (case-insensitive), keeping the most recently seen
+ *  identity — each anonymous device has a unique uid, so the same name would
+ *  otherwise appear once per device. */
+export function knownPeople(): Array<{ uid: string; name: string }> {
+  const map = new Map<string, { uid: string; name: string }>();
+  const seen = new Map<string, number>(); // lower-name -> wall position (higher = newer)
+  let pos = 0;
+  for (const m of messages) {
+    pos++;
+    if (m.senderId && m.senderId !== myUid) {
+      const key = m.name.toLowerCase();
+      if (!seen.has(key) || seen.get(key)! < pos) {
+        seen.set(key, pos);
+        map.set(key, { uid: m.senderId, name: m.name });
+      }
+    }
+  }
+  for (const c of convs) {
+    for (const uid of c.participants) {
+      if (uid !== myUid && c.names[uid]) {
+        const name = c.names[uid];
+        const key = name.toLowerCase();
+        map.set(key, { uid, name });
+      }
+    }
+  }
+  return [...map.values()];
+}
+
+/** Title for a conversation from the viewer's perspective. */
+export function conversationTitle(c: Conversation): string {
+  if (c.type === 'group') return c.title || `Group · ${c.participants.length}`;
+  const other = c.participants.find((p) => p !== myUid);
+  return other && c.names[other] ? c.names[other] : 'Conversation';
+}
+
+// ====================================================================
+// Unread tracking (wall + conversations) for the nav badge
+// ====================================================================
 
 export function markChatSeen() {
   try {
     localStorage.setItem(SEEN_KEY, String(Date.now()));
   } catch {
-    /* storage unavailable */
+    /* ignore */
+  }
+  emitUnread();
+}
+
+export function markConversationSeen(convId: string) {
+  try {
+    const c = convs.find((x) => x.id === convId);
+    if (c) localStorage.setItem(CONV_SEEN_PREFIX + convId, String(c.lastAt));
+  } catch {
+    /* ignore */
   }
   emitUnread();
 }
@@ -205,6 +620,26 @@ function seenTs(): number {
   }
 }
 
+function convSeenTs(convId: string): number {
+  try {
+    const v = Number(localStorage.getItem(CONV_SEEN_PREFIX + convId));
+    return Number.isFinite(v) ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 0 or 1 for the wall (any unseen message), plus one per unseen conversation. */
+export function unreadTotal(): number {
+  const max = messages.reduce((m, x) => (x.ts > m ? x.ts : m), 0);
+  let n = max > seenTs() ? 1 : 0;
+  for (const c of convs) {
+    if (c.lastAt > convSeenTs(c.id)) n += 1;
+  }
+  return n;
+}
+
+/** Kept for compatibility — the old wall-only count. */
 export function unreadCount(): number {
   const max = messages.reduce((m, x) => (x.ts > m ? x.ts : m), 0);
   return max > seenTs() ? 1 : 0;
@@ -212,13 +647,15 @@ export function unreadCount(): number {
 
 export function onUnread(fn: (n: number) => void): () => void {
   unreadListeners.add(fn);
-  fn(unreadCount());
+  fn(unreadTotal());
   return () => {
     unreadListeners.delete(fn);
   };
 }
 
-// ---- sound (Web Audio, no asset file needed) ----
+// ====================================================================
+// Sound (Web Audio, no asset files)
+// ====================================================================
 
 let audioCtx: AudioContext | null = null;
 
@@ -234,26 +671,39 @@ export function unlockAudio() {
   }
 }
 
-/** A friendly two-note "pop" for incoming messages. Silently no-ops if locked. */
+/** Synthesise a soft bell tone (fundamental + warm partials, exponential decay). */
+function bellNote(ctx: AudioContext, freq: number, t: number, dur: number, vol: number) {
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  gain.connect(ctx.destination);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = Math.min(freq * 4, 12000);
+  filter.connect(gain);
+  const partials: Array<[number, number]> = [
+    [1, 1],
+    [2, 0.32],
+    [2.76, 0.13]
+  ];
+  for (const [ratio, _level] of partials) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq * ratio;
+    osc.connect(filter);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  }
+}
+
+/** A warm "ding-bong" for incoming messages. Silently no-ops if audio is locked. */
 export function playChatSound() {
   try {
     if (!audioCtx || audioCtx.state !== 'running') return;
     const t0 = audioCtx.currentTime + 0.01;
-    const notes = [659.25, 987.77];
-    notes.forEach((freq, i) => {
-      const osc = audioCtx!.createOscillator();
-      const gain = audioCtx!.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const t = t0 + i * 0.09;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
-      osc.connect(gain);
-      gain.connect(audioCtx!.destination);
-      osc.start(t);
-      osc.stop(t + 0.42);
-    });
+    bellNote(audioCtx, 988, t0, 0.6, 0.26); // ding (B5)
+    bellNote(audioCtx, 659, t0 + 0.18, 0.8, 0.2); // bong (E5)
   } catch {
     /* sound unavailable — badge still shows */
   }

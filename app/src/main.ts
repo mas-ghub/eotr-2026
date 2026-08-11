@@ -5,22 +5,21 @@ import { runViewCleanup } from './lifecycle';
 import { schedule } from './store';
 import { player } from './audio';
 import { offline, fmtBytes, type OfflineStatus } from './offline';
-import { h, icon, toast, sheet } from './ui';
+import { h, icon, toast, sheet, escapeHtml } from './ui';
 import { initTheme, toggleTheme, currentTheme } from './theme';
-import { maybePromptName, getName } from './greeting';
+import { maybePromptName } from './greeting';
 import { renderLineup } from './views/lineup';
 import { renderTimetable } from './views/timetable';
 import { renderSchedule } from './views/schedule';
 import { renderArtist } from './views/artist';
 import { renderPrint } from './views/print';
 import { renderChat } from './views/chat';
-import { chatStart, onUnread, onChatMessages, unlockAudio, playChatSound } from './chat';
+import { chatStart, onUnread, onIncoming, unlockAudio, playChatSound } from './chat';
 
 let appRoot: HTMLElement;
 let mainEl: HTMLElement;
 let navBadge: HTMLElement;
 let chatBadge: HTMLElement;
-let lastMsgSignature = '';
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -217,8 +216,14 @@ function buildShell(updated: string) {
   refreshBadge();
 
   const refreshChatBadge = (n: number) => {
+    const wasShowing = chatBadge.classList.contains('show');
     chatBadge.textContent = n ? String(n) : '';
     chatBadge.classList.toggle('show', n > 0);
+    if (n > 0 && !wasShowing) {
+      chatBadge.classList.remove('pulse');
+      void chatBadge.offsetWidth; // restart the animation
+      chatBadge.classList.add('pulse');
+    }
   };
   onUnread(refreshChatBadge);
 
@@ -292,21 +297,12 @@ async function renderRoute(route: Route) {
 /** Pop a toast + chime when a NEW message arrives while the user isn't on the chat page. */
 function wireChatNotifications() {
   chatStart();
-  onChatMessages((msgs) => {
-    if (!msgs.length) return;
-    const last = msgs[msgs.length - 1];
-    const sig = `${last.id}:${last.ts}`;
-    if (sig === lastMsgSignature) return;
-    const isFirstLoad = lastMsgSignature === '';
-    lastMsgSignature = sig;
-    // Never toast on the first load (that would greet users with stale messages).
-    if (!isFirstLoad && currentRoute.name !== 'chat') {
-      const isMine = getName()?.toLowerCase() === last.name.toLowerCase();
-      if (!isMine) {
-        playChatSound();
-        toast(`New message from ${last.name}`, { type: 'info', ms: 3200 });
-      }
-    }
+  onIncoming((n) => {
+    // Only notify when the user is elsewhere in the app (not the chat view).
+    if (currentRoute.name === 'chat') return;
+    playChatSound();
+    const where = n.source === 'wall' ? 'posted in Chat' : n.source === 'group' ? 'sent a group message' : 'sent you a message';
+    toast(`<strong>${escapeHtml(n.name)}</strong> ${where}`, { type: 'chat', ms: 3400 });
   });
 }
 

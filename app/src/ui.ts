@@ -113,7 +113,7 @@ export function imageEl(src: string | null, alt: string, className = ''): HTMLEl
 
 let toastRoot: HTMLElement | null = null;
 
-export function toast(message: string, opts: { type?: 'info' | 'success' | 'error'; ms?: number } = {}) {
+export function toast(message: string, opts: { type?: 'info' | 'success' | 'error' | 'chat'; ms?: number } = {}) {
   if (!toastRoot) {
     toastRoot = h('div', { class: 'toastroot' });
     document.body.appendChild(toastRoot);
@@ -121,8 +121,8 @@ export function toast(message: string, opts: { type?: 'info' | 'success' | 'erro
   const node = h(
     'div',
     { class: `toast ${opts.type || 'info'}` },
-    opts.type === 'success' ? iconEl('check', 16) : opts.type === 'error' ? iconEl('alert', 16) : iconEl('note', 16),
-    h('span', {}, message)
+    opts.type === 'success' ? iconEl('check', 16) : opts.type === 'error' ? iconEl('alert', 16) : opts.type === 'chat' ? iconEl('chat', 16) : iconEl('note', 16),
+    h('span', { html: message })
   );
   toastRoot.appendChild(node);
   requestAnimationFrame(() => node.classList.add('show'));
@@ -138,6 +138,11 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms = 200
     clearTimeout(t);
     t = setTimeout(() => fn(...args), ms);
   };
+}
+
+/** Escape a string for safe insertion as innerHTML. */
+export function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 }
 
 export function formatDateKey(dayKey: string): string {

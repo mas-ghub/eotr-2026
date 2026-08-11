@@ -1,4 +1,4 @@
-// Live chat end-to-end: post a message via the UI, watch it appear on a second "device".
+// Chat e2e with two devices: public wall + private DM flow (requires Anonymous auth enabled).
 import puppeteer from 'puppeteer-core';
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
@@ -18,72 +18,110 @@ const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']
 });
 
-// ---- Device A: set name, open chat, send a message ----
-const pageA = await browser.newPage();
-await pageA.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-const errorsA = [];
-pageA.on('console', (m) => { if (m.type() === 'error') errorsA.push(m.text()); });
-pageA.on('pageerror', (e) => errorsA.push(String(e)));
+async function newDevice() {
+  const ctx = await browser.createBrowserContext();
+  const page = await ctx.newPage();
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const errors = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  return { page, errors };
+}
 
-await pageA.goto(BASE + '/#/lineup', { waitUntil: 'networkidle2', timeout: 30000 });
-await pageA.evaluate(() => localStorage.clear());
-await pageA.reload({ waitUntil: 'networkidle2' });
-await sleep(2500);
+// ---- Device A (Alpha) ----
+const A = await newDevice();
+await A.page.goto(BASE + '/#/lineup', { waitUntil: 'networkidle2', timeout: 30000 });
+await A.page.evaluate(() => localStorage.clear());
+await A.page.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 30000 });
+await A.page.evaluate(() => localStorage.setItem('eotr2026.name.v1', 'Alpha'));
+await A.page.reload({ waitUntil: 'networkidle2' });
+await sleep(3000);
 
-// Set name via the welcome prompt (or skip if not shown)
-await pageA.evaluate(() => {
-  const input = document.querySelector('.welcome-card__input');
-  if (input) {
-    input.value = 'Alpha';
-    input.dispatchEvent(new Event('input'));
-    document.querySelector('.welcome-card__go')?.click();
-  }
-});
-await sleep(800);
+const statusA = await A.page.$eval('.chat-status', (el) => el.textContent.trim()).catch(() => null);
+ok('dm: device A chat is live', !!statusA && statusA.startsWith('Live'), statusA || 'n/a');
 
-await pageA.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 20000 });
-await sleep(2500);
+// ---- Device B (Bravo) posts to the wall ----
+const B = await newDevice();
+await B.page.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 30000 });
+await B.page.evaluate(() => localStorage.clear());
+await B.page.evaluate(() => localStorage.setItem('eotr2026.name.v1', 'Bravo'));
+await B.page.reload({ waitUntil: 'networkidle2' });
+await sleep(3000);
 
-// Composer should be enabled (name known)
-const composerInput = await pageA.$eval('.chat-composer__input', (el) => !!el).catch(() => false);
-ok('chat: composer active with name set', composerInput);
-
-const statusA = await pageA.$eval('.chat-status', (el) => el.textContent.trim()).catch(() => null);
-ok('chat: status is live', !!statusA && statusA.startsWith('Live'), statusA || 'n/a');
-
-await pageA.evaluate((t) => {
+await B.page.evaluate((t) => {
   const input = document.querySelector('.chat-composer__input');
-  input.value = t;
+  input.value = `hello from Bravo ${t}`;
   input.dispatchEvent(new Event('input'));
   document.querySelector('.chat-composer__send').click();
-}, `Hello from Alpha ${tag}`);
+}, tag);
+await sleep(3500);
+
+const seenOnA = await A.page.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(t)), `hello from Bravo ${tag}`);
+ok('dm: public wall still works cross-device', seenOnA);
+
+// ---- A taps Bravo's FRESH message on the wall -> DM (so senderId = B's uid) ----
+const tapOK = await A.page.evaluate((t) => {
+  const msgs = [...document.querySelectorAll('.chat-msg')];
+  const fresh = msgs.find((m) => m.querySelector('.chat-msg__bubble')?.textContent.includes(t));
+  const btn = fresh?.querySelector('.chat-msg__name--tap');
+  if (!btn) return false;
+  btn.click();
+  return true;
+}, `hello from Bravo ${tag}`);
+ok('dm: Bravo name is tappable on the wall', tapOK);
+await sleep(2500);
+
+const inConvA = await A.page.$eval('.chat-headrow', (el) => !!el).catch(() => false);
+const convTitleA = await A.page.$eval('.chat-title--conv', (el) => el.textContent.trim()).catch(() => null);
+ok('dm: A opens a private conversation', inConvA && convTitleA === 'Bravo', convTitleA || 'n/a');
+
+await A.page.evaluate((t) => {
+  const input = document.querySelector('.chat-composer__input');
+  input.value = `private hi ${t}`;
+  input.dispatchEvent(new Event('input'));
+  document.querySelector('.chat-composer__send').click();
+}, tag);
 await sleep(3000);
 
-const sentVisible = await pageA.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(t)), `Hello from Alpha ${tag}`);
-ok('chat: message appears in my own wall', sentVisible);
+const inOwnConv = await A.page.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(`private hi ${t}`)), tag);
+ok('dm: DM message shows in A conversation', inOwnConv);
 
-// ---- Device B: fresh context, open chat, should see the message ----
-const ctxB = await browser.createBrowserContext();
-const pageB = await ctxB.newPage();
-await pageB.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-await pageB.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 30000 });
-await sleep(3000);
-
-const seenOnB = await pageB.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(t)), `Hello from Alpha ${tag}`);
-ok('chat: message arrives on a second device', seenOnB);
-
-const mineOnA = await pageA.evaluate(() => {
-  const mine = [...document.querySelectorAll('.chat-msg')].filter((m) => m.classList.contains('mine'));
-  return mine.length >= 1;
+// ---- B checks Chats list + opens the DM ----
+await B.page.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 20000 });
+await sleep(2500);
+const convTab = await B.page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('.chat-seg__tab')];
+  const tab = tabs.find((t) => t.textContent.includes('Chats'));
+  if (!tab) return false;
+  tab.click();
+  return true;
 });
-ok('chat: my message is styled as "mine"', mineOnA);
+ok('dm: B can switch to Chats', convTab);
+await sleep(1200);
 
-await pageA.goto(BASE + '/#/lineup', { waitUntil: 'networkidle2', timeout: 20000 });
-await sleep(1500);
-const badge = await pageA.$eval('.app-nav__badge.chat-badge', (el) => el.classList.contains('show')).catch(() => false);
-ok('chat: unread badge not shown after viewing chat', !badge);
+const listHasConv = await B.page.$eval('.chat-conv-row', (el) => el.textContent.includes('Alpha')).catch(() => false);
+ok('dm: B sees the conversation in Chats', listHasConv);
 
-const realErrors = [...errorsA].filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
+await B.page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.chat-conv-row')];
+  const row = rows.find((r) => r.textContent.includes('Alpha'));
+  row.click();
+});
+await sleep(2000);
+const seesDM = await B.page.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(`private hi ${t}`)), tag);
+ok('dm: B reads the private message', seesDM);
+
+// Privacy: the DM text must NOT be on the public wall
+await B.page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('.chat-seg__tab')];
+  const tab = tabs.find((t) => t.textContent.trim() === 'Everyone');
+  if (tab) tab.click();
+});
+await sleep(800);
+const leaked = await B.page.evaluate((t) => [...document.querySelectorAll('.chat-msg__bubble')].some((b) => b.textContent.includes(`private hi ${t}`)), tag);
+ok('dm: private message is NOT on the public wall', !leaked);
+
+const realErrors = [...A.errors, ...B.errors].filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
 ok('no console errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '));
 
 await Promise.race([browser.close().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
