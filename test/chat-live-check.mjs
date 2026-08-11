@@ -27,7 +27,7 @@ const status = await page.$eval('.chat-status', (el) => el.textContent.trim()).c
 console.log((status && status.startsWith('Live') ? 'PASS' : 'FAIL') + `  live: status "${status}"`);
 
 const tabs = await page.$$eval('.app-nav__tab', (els) => els.length);
-console.log((tabs === 5 ? 'PASS' : 'FAIL') + `  live: nav has ${tabs} tabs`);
+console.log((tabs === 4 ? 'PASS' : 'FAIL') + `  live: nav has ${tabs} tabs`);
 
 const realErrors = errors.filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
 console.log((realErrors.length === 0 ? 'PASS' : 'FAIL') + '  live: no console errors' + (realErrors.length ? ' — ' + realErrors.slice(0, 2).join(' | ') : ''));

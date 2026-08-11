@@ -23,9 +23,7 @@ const SUITES = [
   'chat-check.mjs',
   'chat-e2e.mjs',
   'group-e2e.mjs',
-  'name-unique-check.mjs',
-  'map-check.mjs',
-  'map-e2e.mjs'
+  'name-unique-check.mjs'
 ];
 
 function run(cmd, args, cwd) {

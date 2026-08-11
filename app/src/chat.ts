@@ -366,20 +366,6 @@ export function isConfigured(): boolean {
   return chatConfig() !== null;
 }
 
-/** Shared Firestore handle (lazy init). Used by the presence/location module. */
-export async function getDb(): Promise<Firestore | null> {
-  return initFirestore();
-}
-
-/** sessionStorage key: set by the map view before navigating to #/chat so the
- *  chat view can jump straight into a conversation. */
-export const PENDING_CONV_KEY = 'eotr2026.pendingconv.v1';
-
-/** Ensure anonymous auth and return the uid. Used by the presence/location module. */
-export async function getUid(): Promise<string | null> {
-  return ensureAuth();
-}
-
 export function currentUid(): string | null {
   return myUid;
 }

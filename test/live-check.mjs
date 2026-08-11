@@ -24,12 +24,12 @@ const cards = await page.$$eval('.artist-card', (els) => els.length).catch(() =>
 console.log((cards > 50 ? 'PASS' : 'FAIL') + `  live: lineup renders (${cards} cards)`);
 
 const nav = await page.$$eval('.app-nav__tab', (els) => els.length);
-console.log((nav === 5 ? 'PASS' : 'FAIL') + `  live: nav has ${nav} tabs`);
+console.log((nav === 4 ? 'PASS' : 'FAIL') + `  live: nav has ${nav} tabs`);
 
-await page.goto(BASE + '/#/map', { waitUntil: 'networkidle2', timeout: 60000 });
+await page.goto(BASE + '/#/chat', { waitUntil: 'networkidle2', timeout: 60000 });
 await sleep(2500);
-const mapView = await page.$eval('.map-view', (el) => !!el).catch(() => false);
-console.log((mapView ? 'PASS' : 'FAIL') + '  live: map view renders');
+const chatView = await page.$eval('.chat-view', (el) => !!el).catch(() => false);
+console.log((chatView ? 'PASS' : 'FAIL') + '  live: chat view renders');
 
 const realErrors = errors.filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
 console.log((realErrors.length === 0 ? 'PASS' : 'FAIL') + '  live: no console errors' + (realErrors.length ? ' — ' + realErrors.slice(0, 2).join(' | ') : ''));
