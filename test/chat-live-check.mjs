@@ -1,4 +1,5 @@
-// Live sanity: chat tab + "coming soon" state on the deployed site.
+// Live sanity (READ-ONLY — never writes to Firestore): chat view renders, is
+// live, nav has 5 tabs, no console errors.
 import puppeteer from 'puppeteer-core';
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
@@ -23,10 +24,10 @@ const chatView = await page.$eval('.chat-view', (el) => !!el).catch(() => false)
 console.log((chatView ? 'PASS' : 'FAIL') + '  live: chat view renders');
 
 const status = await page.$eval('.chat-status', (el) => el.textContent.trim()).catch(() => null);
-console.log((status === 'Chat is coming soon' ? 'PASS' : 'FAIL') + `  live: status "${status}"`);
+console.log((status && status.startsWith('Live') ? 'PASS' : 'FAIL') + `  live: status "${status}"`);
 
 const tabs = await page.$$eval('.app-nav__tab', (els) => els.length);
-console.log((tabs === 4 ? 'PASS' : 'FAIL') + `  live: nav has ${tabs} tabs`);
+console.log((tabs === 5 ? 'PASS' : 'FAIL') + `  live: nav has ${tabs} tabs`);
 
 const realErrors = errors.filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
 console.log((realErrors.length === 0 ? 'PASS' : 'FAIL') + '  live: no console errors' + (realErrors.length ? ' — ' + realErrors.slice(0, 2).join(' | ') : ''));

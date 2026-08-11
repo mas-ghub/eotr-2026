@@ -32,6 +32,10 @@ const ONLINE_WINDOW_MS = 120000; // 2 min without a heartbeat => offline
 const LOCATION_WRITE_MS = 30000; // don't write more than every 30s
 const MOVE_M = 20; // only write if moved ~20m or the interval elapsed
 
+/** Optional collection namespace so tests can run against isolated collections. */
+const PREFIX = (import.meta.env.VITE_FIRESTORE_PREFIX || '').replace(/[^A-Za-z0-9_]/g, '');
+const c = (name: string) => PREFIX + name;
+
 let db: Firestore | null = null;
 let watchId: number | null = null;
 let locTimer: ReturnType<typeof setInterval> | null = null;
@@ -94,7 +98,7 @@ export async function presenceStart(): Promise<void> {
   const beat = async (online: boolean) => {
     try {
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-      const ref = doc(firestore, 'presence', uid);
+      const ref = doc(firestore, c('presence'), uid);
       await setDoc(
         ref,
         { name: currentName(), online, lastSeen: serverTimestamp() },
@@ -116,7 +120,7 @@ export async function presenceStart(): Promise<void> {
 
   try {
     const { collection, query, where, onSnapshot } = await import('firebase/firestore');
-    const q = query(collection(firestore, 'presence'), where('online', '==', true));
+    const q = query(collection(firestore, c('presence')), where('online', '==', true));
     onSnapshot(
       q,
       (snap) => {
@@ -199,7 +203,7 @@ async function writeLocation(pos: { lat: number; lng: number; accuracy: number }
   try {
     const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
     await setDoc(
-      doc(firestore, 'locations', uid),
+      doc(firestore, c('locations'), uid),
       { name: currentName(), lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, ts: serverTimestamp() },
       { merge: true }
     );
@@ -284,7 +288,7 @@ export function stopSharing(): void {
     if (!firestore || !uid) return;
     try {
       const { doc, deleteDoc } = await import('firebase/firestore');
-      await deleteDoc(doc(firestore, 'locations', uid));
+      await deleteDoc(doc(firestore, c('locations'), uid));
     } catch {
       /* ignore */
     }
@@ -315,7 +319,7 @@ export async function subscribeLocations(): Promise<void> {
   try {
     const { collection, onSnapshot } = await import('firebase/firestore');
     onSnapshot(
-      collection(firestore, 'locations'),
+      collection(firestore, c('locations')),
       (snap) => {
         const now = Date.now();
         locationUsers = snap.docs

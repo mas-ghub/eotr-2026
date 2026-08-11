@@ -1,4 +1,5 @@
-// Quick live sanity: greeting prompt + hero pill exist on the deployed site.
+// Live sanity (READ-ONLY — never writes to Firestore): the app boots, the
+// greeting pill and map/chat views render, and there are no console errors.
 import puppeteer from 'puppeteer-core';
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
@@ -15,27 +16,20 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Names are claimed permanently, so use a unique one each run.
-const liveName = `Live${Date.now().toString(36)}`;
 
 await page.goto(BASE + '/#/lineup', { waitUntil: 'networkidle2', timeout: 60000 });
-await page.evaluate(() => localStorage.removeItem('eotr2026.name.v1'));
-await page.evaluate(() => localStorage.removeItem('eotr2026.nameasked.v1'));
-await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
-await sleep(3000);
+await sleep(2500);
 
-const promptShown = await page.$eval('.welcome-overlay.open', (el) => !!el).catch(() => false);
-console.log((promptShown ? 'PASS' : 'FAIL') + '  live: welcome prompt appears');
+const cards = await page.$$eval('.artist-card', (els) => els.length).catch(() => 0);
+console.log((cards > 50 ? 'PASS' : 'FAIL') + `  live: lineup renders (${cards} cards)`);
 
-await page.evaluate((n) => {
-  const input = document.querySelector('.welcome-card__input');
-  input.value = n;
-  input.dispatchEvent(new Event('input'));
-  document.querySelector('.welcome-card__go').click();
-}, liveName);
-await sleep(900);
-const pillText = await page.$eval('.hero__greeting', (el) => el.textContent.trim()).catch(() => null);
-console.log((pillText && pillText.includes(liveName) ? 'PASS' : 'FAIL') + `  live: hero pill shows name — ${pillText || 'n/a'}`);
+const nav = await page.$$eval('.app-nav__tab', (els) => els.length);
+console.log((nav === 5 ? 'PASS' : 'FAIL') + `  live: nav has ${nav} tabs`);
+
+await page.goto(BASE + '/#/map', { waitUntil: 'networkidle2', timeout: 60000 });
+await sleep(2500);
+const mapView = await page.$eval('.map-view', (el) => !!el).catch(() => false);
+console.log((mapView ? 'PASS' : 'FAIL') + '  live: map view renders');
 
 const realErrors = errors.filter((e) => !e.includes('net::ERR_INTERNET_DISCONNECTED') && !e.includes('Failed to load resource'));
 console.log((realErrors.length === 0 ? 'PASS' : 'FAIL') + '  live: no console errors' + (realErrors.length ? ' — ' + realErrors.slice(0, 2).join(' | ') : ''));

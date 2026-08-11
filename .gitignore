@@ -5,7 +5,10 @@ test/node_modules/
 test/*.png
 test/smoke.log
 app/dist/
+app/dist-test/
 app/.env
 app/.env.local
+app/.env.*
+!app/.env.example
 *.log
 .DS_Store

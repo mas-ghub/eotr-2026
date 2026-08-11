@@ -50,6 +50,15 @@ const MSG_LIMIT = 280;
 const NAME_LIMIT = 24;
 const GROUP_MAX = 20;
 
+/**
+ * Optional collection namespace so tests can run against isolated collections
+ * (VITE_FIRESTORE_PREFIX=devtest_) and never write to the live app data.
+ */
+const PREFIX = (import.meta.env.VITE_FIRESTORE_PREFIX || '').replace(/[^A-Za-z0-9_]/g, '');
+const c = (name: string) => PREFIX + name;
+const convPath = (convId: string) => c('conversations') + '/' + convId + '/messages';
+const convDoc = (convId: string) => c('conversations') + '/' + convId;
+
 /** Returns the Firebase config from app/.env, or null if chat isn't set up yet. */
 function chatConfig(): Record<string, string> | null {
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
@@ -207,7 +216,7 @@ function mapConvDoc(id: string, data: Record<string, unknown>): Conversation {
 async function subscribeWall() {
   if (!db || unsubWall) return;
   const { collection, query, orderBy, limitToLast, onSnapshot } = await import('firebase/firestore');
-  const q = query(collection(db, 'messages'), orderBy('ts', 'asc'), limitToLast(MAX_MESSAGES));
+  const q = query(collection(db, c('messages')), orderBy('ts', 'asc'), limitToLast(MAX_MESSAGES));
   unsubWall = onSnapshot(
     q,
     (snap) => {
@@ -232,7 +241,7 @@ async function subscribeConvs() {
   if (!db || !myUid || unsubConvs) return;
   try {
     const { collection, query, where, onSnapshot } = await import('firebase/firestore');
-    const q = query(collection(db, 'conversations'), where('participants', 'array-contains', myUid));
+    const q = query(collection(db, c('conversations')), where('participants', 'array-contains', myUid));
     unsubConvs = onSnapshot(
       q,
       (snap) => {
@@ -270,7 +279,7 @@ async function ensureConvIncoming(c: Conversation) {
   if (convIncoming.has(c.id) || !db) return;
   try {
     const { collection, query, orderBy, limitToLast, onSnapshot } = await import('firebase/firestore');
-    const q = query(collection(db, 'conversations', c.id, 'messages'), orderBy('ts', 'asc'), limitToLast(1));
+    const q = query(collection(db, convPath(c.id)), orderBy('ts', 'asc'), limitToLast(1));
     const un = onSnapshot(
       q,
       (snap) => {
@@ -429,7 +438,7 @@ export function listenConversation(convId: string, fn: (msgs: ChatMessage[]) => 
   if (db) {
     void (async () => {
       const f = await import('firebase/firestore');
-      const q = f.query(f.collection(db!, 'conversations', convId, 'messages'), f.orderBy('ts', 'asc'), f.limitToLast(MAX_MESSAGES));
+      const q = f.query(f.collection(db!, convPath(convId)), f.orderBy('ts', 'asc'), f.limitToLast(MAX_MESSAGES));
       unsub = f.onSnapshot(
         q,
         (snap) => {
@@ -459,7 +468,7 @@ export async function sendMessage(name: string, text: string): Promise<boolean> 
   if (!firestore) return false;
   try {
     const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-    await addDoc(collection(firestore, 'messages'), { name: who, text: clean, ts: serverTimestamp(), senderId: myUid });
+    await addDoc(collection(firestore, c('messages')), { name: who, text: clean, ts: serverTimestamp(), senderId: myUid });
     return true;
   } catch {
     return false;
@@ -490,7 +499,7 @@ export async function claimName(displayName: string): Promise<ClaimResult> {
   const id = name.toLowerCase();
   try {
     const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
-    const ref = doc(firestore, 'names', id);
+    const ref = doc(firestore, c('names'), id);
     let exists = false;
     let mine = false;
     try {
@@ -530,7 +539,7 @@ export async function openDm(otherUid: string, otherName: string): Promise<Conve
   const convId = `dm_${sorted[0]}_${sorted[1]}`;
   try {
     const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-    const ref = doc(firestore, 'conversations', convId);
+    const ref = doc(firestore, convDoc(convId));
     // Merge upsert: creates if missing, otherwise preserves existing fields
     // (e.g. the other participant's name). No getDoc — reading a doc that
     // doesn't exist yet is denied by the read rule (resource is null).
@@ -566,7 +575,7 @@ export async function createGroup(title: string, members: Array<{ uid: string; n
   const convId = `grp_${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.floor(Math.random() * 1e6)}`}`;
   try {
     const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-    await setDoc(doc(firestore, 'conversations', convId), {
+    await setDoc(doc(firestore, convDoc(convId)), {
       type: 'group',
       title: clean,
       participants,
@@ -590,14 +599,14 @@ export async function sendConversationMessage(convId: string, name: string, text
   if (!firestore) return false;
   try {
     const { collection, addDoc, serverTimestamp, updateDoc, doc } = await import('firebase/firestore');
-    await addDoc(collection(firestore, 'conversations', convId, 'messages'), {
+    await addDoc(collection(firestore, convPath(convId)), {
       name: who,
       text: clean,
       ts: serverTimestamp(),
       senderId: myUid
     });
     // Touch the conversation header so the Chats list reorders + previews.
-    await updateDoc(doc(firestore, 'conversations', convId), {
+    await updateDoc(doc(firestore, convDoc(convId)), {
       lastAt: serverTimestamp(),
       lastText: clean,
       [`names.${myUid}`]: who
