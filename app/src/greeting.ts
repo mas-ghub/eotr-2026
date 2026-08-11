@@ -1,4 +1,5 @@
 import { h, icon, iconEl, toast } from './ui';
+import { isConfigured, claimName } from './chat';
 
 const NAME_KEY = 'eotr2026.name.v1';
 const ASKED_KEY = 'eotr2026.nameasked.v1';
@@ -103,19 +104,48 @@ export function promptForName(force = false): Promise<string | null> {
       placeholder: 'Your first name…',
       'aria-label': 'Your first name'
     }) as HTMLInputElement;
+    const goBtn = h('button', {
+      class: 'btn btn-primary welcome-card__go',
+      type: 'button',
+      html: `${icon('sparkle', 15)} Continue`
+    }) as HTMLButtonElement;
 
-    const submit = () => {
+    let busy = false;
+    const setBusy = (b: boolean) => {
+      busy = b;
+      goBtn.disabled = b;
+      goBtn.innerHTML = b ? `${icon('sparkle', 15)} Checking…` : `${icon('sparkle', 15)} Continue`;
+    };
+
+    const submit = async () => {
+      if (busy) return;
       const name = cleanName(input.value);
       if (!name) {
         err.textContent = 'Tell us your name to get started.';
         input.classList.add('invalid');
         return;
       }
+      // Check the name isn't already claimed by someone else. Best-effort:
+      // if the check can't run (offline / not set up), we still let them use
+      // it locally rather than blocking a festival guestbook message.
+      if (isConfigured() && navigator.onLine) {
+        setBusy(true);
+        const result = await claimName(name);
+        setBusy(false);
+        if (result === 'taken') {
+          err.textContent = `“${name}” is already taken — try another ✨`;
+          input.classList.add('invalid');
+          return;
+        }
+        if (result === 'unavailable') {
+          // fall through and accept locally
+        }
+      }
       saveName(name);
       finish(name);
     };
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submit();
+      if (e.key === 'Enter') void submit();
     });
     input.addEventListener('input', () => {
       err.textContent = '';
@@ -130,10 +160,10 @@ export function promptForName(force = false): Promise<string | null> {
       h('p', { class: 'welcome-card__sub' }, 'What should we call you?'),
       input,
       err,
-      h('button', { class: 'btn btn-primary welcome-card__go', type: 'button', html: `${icon('sparkle', 15)} Continue` }),
-      h('p', { class: 'welcome-card__note' }, 'Just so we can say hello — stored only on this device.')
+      goBtn,
+      h('p', { class: 'welcome-card__note' }, 'Just so we can say hello — stored only on this device. First come, first served on names.')
     );
-    card.querySelector('.welcome-card__go')!.addEventListener('click', submit);
+    goBtn.addEventListener('click', () => void submit());
 
     const overlay = h('div', { class: 'welcome-overlay' }, card);
     document.body.appendChild(overlay);

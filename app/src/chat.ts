@@ -452,6 +452,60 @@ export async function sendMessage(name: string, text: string): Promise<boolean> 
   }
 }
 
+// ====================================================================
+// Unique-name claiming (the `names` collection)
+// ====================================================================
+
+export type ClaimResult = 'ok' | 'taken' | 'unavailable';
+
+/**
+ * Claim a display name so it can't be used by two people at once.
+ * Names are case-insensitively unique (doc id = lowercased name). Only the
+ * device that first claims a name may keep using/changing it; a second device
+ * trying the same name gets 'taken'. Returns 'unavailable' when the check
+ * can't run (offline / rules not published yet) so the app can still fall back
+ * to a purely local name rather than blocking a guestbook message.
+ */
+export async function claimName(displayName: string): Promise<ClaimResult> {
+  const name = displayName.trim().slice(0, NAME_LIMIT);
+  if (!name) return 'taken';
+  const firestore = await initFirestore();
+  if (!firestore) return 'unavailable';
+  const uid = await ensureAuth();
+  if (!uid) return 'unavailable';
+  const id = name.toLowerCase();
+  try {
+    const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    const ref = doc(firestore, 'names', id);
+    let exists = false;
+    let mine = false;
+    try {
+      const snap = await getDoc(ref);
+      exists = snap.exists();
+      mine = exists && snap.data()?.uid === uid;
+    } catch {
+      // Can't read the names collection — rules may not include it yet.
+      return 'unavailable';
+    }
+    if (exists) {
+      if (mine) {
+        try {
+          await setDoc(ref, { name, uid, ts: serverTimestamp() }, { merge: true });
+          return 'ok';
+        } catch {
+          return 'unavailable';
+        }
+      }
+      return 'taken';
+    }
+    await setDoc(ref, { name, uid, ts: serverTimestamp() });
+    return 'ok';
+  } catch {
+    // Create failed — someone else grabbed the name in the race window.
+    return 'taken';
+  }
+}
+
 /** Open (or create) a DM with another user. Returns the conversation or null. */
 export async function openDm(otherUid: string, otherName: string): Promise<Conversation | null> {
   const myName = currentName();
