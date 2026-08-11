@@ -22,6 +22,8 @@ offline 20s audio previews per artist.
 | `src/greeting.ts` | Name greeting: first-launch welcome prompt, time-of-day hero pill, localStorage name |
 | `src/chat.ts` | Firebase chat engine: lazy Firestore init (code-split), anonymous auth, realtime wall + conversations, DMs/groups, unread badge, Web Audio chime |
 | `src/views/chat.ts` | `#/chat` view: Everyone wall + Chats list + conversation threads, composer ("Posting as …"), tap-name-to-DM, New chat picker, status pill |
+| `src/location.ts` | Presence heartbeats ("who's online") + opt-in geolocation sharing (`locations` collection), Leaflet map data source |
+| `src/views/map.ts` | `#/map` view: Leaflet map with per-uid markers, online chip strip, share toggle + privacy note, tap-to-DM |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -428,6 +430,39 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
   (local) and `test/name-unique-live.mjs` **6/6** (deployed site): claim, taken rejection with
   no save, fallback acceptance. greeting-check updated for permanent claims (**9/9**), DM e2e
   **10/10**, group e2e **7/7** still green. Deployed to GitHub Pages.
+
+## 16. Find Your Friends map + presence (2026-08-11)
+
+- **`src/location.ts`** (new): two concerns.
+  - *Presence*: `presenceStart()` (called on boot) writes `presence/{uid}` with
+    `{ name, online: true, lastSeen }` every 30 s and flips `online: false` on `pagehide` /
+    `visibilitychange → hidden`. A `where('online','==',true)` snapshot + 2-minute lastSeen
+    window drives the "who's online" strip. `name` comes from the greeting store.
+  - *Location sharing*: strictly opt-in. `startSharing()` calls `navigator.geolocation.watchPosition`
+    (high accuracy) and writes `locations/{uid}` with `{ name, lat, lng, accuracy, ts }` when moved
+    ~20 m or 30 s elapsed; `stopSharing()` clears the watch and **deletes** the doc; a pref in
+    localStorage (`eotr2026.shareloc.v1`) resumes sharing on the next visit.
+- **`src/views/map.ts`** (new): `#/map` route + 5th nav tab (pin icon). Leaflet **1.9.4**
+  (verified latest; code-split — the 43 KB gzip chunk only loads on this view), tile layer from
+  OpenStreetMap, `circleMarker`s coloured per-uid (`colorForUid`), popups with "Message", and a
+  "New chat → DM" flow via a pending-conversation sessionStorage jump into `#/chat`. Online chip
+  strip (tap → DM). Share toggle reflects `ShareStatus` (off/connecting/on/denied/error/
+  unsupported) with a privacy note. Dark-theme overrides for Leaflet controls.
+- **`firestore.rules`**: added `presence` and `locations` — any signed-in visitor may read;
+  a device may only write its own uid doc; lat/lng/accuracy validated; own-doc delete allowed.
+  (User published these.)
+- **Two real bugs fixed during verification**: (1) the locations listener attached before
+  anonymous auth completed → an uncaught "permission-denied" snapshot error (the SDK recovers,
+  but it logged noise); now `subscribeLocations()` awaits `getUid()` first. (2) `paint()` ran on
+  the synchronous `onLocations` fire inside `renderMap` before the view was appended to the DOM →
+  "Map container not found"; now guards the container. (Also learned: stale local service-worker
+  caches made local tests look like app bugs — tests now unregister + clear caches.)
+- **Privacy stance**: presence is automatic while the app is open; location is always opt-in and
+  self-deleting; locations older than 30 min are hidden. Users can stop any time.
+- **Status**: SW bumped to `eotr2026-v1.14.0`. New suites `test/map-check.mjs` **10/10** (UI +
+  geolocation override) and `test/map-e2e.mjs` **8/8** (two-device: both share → see each other's
+  pin + chip → tap-to-DM → stop sharing keeps presence) plus `test/map-e2e-live.mjs` **8/8**
+  (deployed site). Full regression green. Deployed to GitHub Pages.
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
   Clashfinder). They are NOT fetched live by the PWA.
