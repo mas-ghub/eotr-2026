@@ -1,7 +1,7 @@
 import { loadData } from '../data';
 import { navigate } from '../router';
 import { h, icon, toast } from '../ui';
-import { typeBadge, scheduleButton, dayShort } from './common';
+import { typeBadge, scheduleButton, reminderControl, dayShort } from './common';
 import { player, extractClip, saveClip, listClips, deleteClip, downloadBlob, clipExtension, type SavedClip } from '../audio';
 import { onViewCleanup } from '../lifecycle';
 import type { Artist, PreviewTrack } from '../types';
@@ -259,7 +259,8 @@ export async function renderArtist(slug: string): Promise<HTMLElement> {
             h('span', { class: 'set-row__time' }, `${act.start} – ${act.end}`),
             h('span', { class: 'set-row__stage' }, act.stage)
           ),
-          scheduleButton(act)
+          scheduleButton(act),
+          reminderControl(act)
         )
       );
     }

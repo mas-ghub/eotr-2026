@@ -44,6 +44,21 @@ export function timeOfDay(ms: number): number {
   return (ms % 86400000) / 60000;
 }
 
+/** Absolute epoch ms for a set, from its day + startMs-as-time-of-day. The data
+ *  stores startMs as ms since midnight (UK time), so combine it with the day key
+ *  (festival is in BST in September). Falls back to startMs if the parse fails. */
+export function festivalStartMs(act: { dayKey: string; startMs: number }): number {
+  try {
+    const dayMin = (act.startMs % 86400000) / 60000;
+    const hh = String(Math.floor(dayMin / 60)).padStart(2, '0');
+    const mm = String(Math.floor(dayMin % 60)).padStart(2, '0');
+    const ms = new Date(`${act.dayKey}T${hh}:${mm}:00+01:00`).getTime();
+    return Number.isFinite(ms) ? ms : act.startMs;
+  } catch {
+    return act.startMs;
+  }
+}
+
 export function formatDuration(ms: number): string {
   const s = Math.round(ms / 1000);
   const m = Math.floor(s / 60);

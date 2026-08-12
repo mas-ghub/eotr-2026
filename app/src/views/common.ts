@@ -1,6 +1,16 @@
 import type { Act, ActType } from '../types';
 import { schedule } from '../store';
-import { h, icon } from '../ui';
+import { h, icon, sheet, toast } from '../ui';
+import {
+  LEAD_OPTIONS,
+  getReminder,
+  allReminders,
+  removeReminder,
+  setReminder,
+  notificationState,
+  requestNotificationPermission,
+  type LeadOption
+} from '../reminders';
 
 export const TYPE_LABEL: Record<ActType, string> = {
   music: 'Music',
@@ -57,4 +67,98 @@ export function scheduleButton(act: Act, onChanged?: () => void): HTMLElement {
     onChanged?.();
   });
   return btn;
+}
+
+/**
+ * "Remind me" bell. Tapping it opens a sheet to pick a lead time (at showtime /
+ * 15/30/60 min before) or clear an active reminder. Self-contained: reads the
+ * latest state from localStorage each time, so it needs no subscriptions.
+ */
+export function reminderControl(act: Act): HTMLElement {
+  const refresh = (btn: HTMLButtonElement) => {
+    const rem = getReminder(act.id);
+    const on = !!rem;
+    btn.classList.toggle('rem-on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.querySelector('.sch-btn__icon')!.innerHTML = on ? icon('bellFill', 18) : icon('bell', 18);
+    btn.setAttribute('aria-label', on ? `Reminder set for ${act.name} — tap to change` : `Remind me about ${act.name}`);
+  };
+
+  const btn = h(
+    'button',
+    { class: 'sch-btn rem', type: 'button', 'aria-pressed': 'false', 'aria-label': `Remind me about ${act.name}` },
+    h('span', { class: 'sch-btn__icon', html: icon('bell', 18) })
+  ) as HTMLButtonElement;
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openReminderSheet(act, () => refresh(btn));
+  });
+  refresh(btn);
+  return btn;
+}
+
+function openReminderSheet(act: Act, onDone: () => void) {
+  // `active` is a live reminder; `anyStored` also covers a reminder that has
+  // already fired (still in storage until the grace-period purge) so the user
+  // can always clear it. The bell itself only lights up for `active`.
+  const active = getReminder(act.id);
+  const anyStored = allReminders().find((r) => r.actId === act.id);
+  const body = h('div', { class: 'rem-sheet' });
+
+  if (active) {
+    body.appendChild(
+      h('p', { class: 'rem-sheet__current' }, `${icon('bellFill', 14)} Reminder on — ${LEAD_OPTIONS.find((o) => o.value === active.leadMin)?.label ?? ''}`)
+    );
+  }
+
+  const list = h('div', { class: 'rem-sheet__list' });
+  const perm = notificationState();
+
+  const pick = async (opt: LeadOption) => {
+    let state = perm;
+    if (state === 'default') {
+      state = await requestNotificationPermission();
+    }
+    if (state === 'denied' || state === 'unsupported') {
+      toast('Notifications are blocked — allow them in your phone/browser settings to get reminders.', { type: 'error', ms: 4600 });
+      return;
+    }
+    const ok = await setReminder(act, opt.value);
+    if (ok) {
+      closeSheet();
+      onDone();
+      toast(`Reminder set — we’ll nudge you ${opt.label.toLowerCase()}.`, { type: 'success', ms: 3000 });
+    }
+  };
+
+  for (const opt of LEAD_OPTIONS) {
+    const isCurrent = active && active.leadMin === opt.value;
+    const row = h(
+      'button',
+      { class: 'rem-sheet__opt' + (isCurrent ? ' on' : ''), type: 'button' },
+      h('span', {}, opt.label),
+      isCurrent ? h('span', { class: 'rem-sheet__check', html: icon('check', 14) }) : null
+    );
+    row.addEventListener('click', () => void pick(opt));
+    list.appendChild(row);
+  }
+  body.appendChild(list);
+
+  if (anyStored) {
+    const remove = h('button', { class: 'rem-sheet__remove', type: 'button' }, 'Remove reminder');
+    remove.addEventListener('click', () => {
+      removeReminder(act.id);
+      closeSheet();
+      onDone();
+      toast('Reminder removed.', { type: 'info', ms: 2200 });
+    });
+    body.appendChild(remove);
+  }
+
+  body.appendChild(
+    h('p', { class: 'rem-sheet__note' }, 'We’ll ping you just before the set starts. For this to work in your pocket, keep the app installed and notifications allowed.')
+  );
+
+  const closeSheet = sheet({ title: act.name, body }).close;
 }

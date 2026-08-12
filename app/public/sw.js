@@ -2,7 +2,7 @@
  * Bump CACHE_VERSION whenever the app or the festival data changes so clients
  * download fresh copies.
  */
-const CACHE_VERSION = 'eotr2026-v1.16.0';
+const CACHE_VERSION = 'eotr2026-v1.17.0';
 const APP_CACHE = `app-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 // The page downloads all clips into this cache with progress UI, so offline
@@ -135,4 +135,29 @@ self.addEventListener('fetch', (event) => {
   if (/\.(png|jpe?g|webp|avif|gif|svg|m4a|mp3|mp4|webm|aac)(\?|$)/i.test(url.pathname)) {
     event.respondWith(cacheFirst(request));
   }
+});
+
+// Tap a reminder notification -> focus the app and open the relevant page.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of all) {
+        if ('focus' in client) {
+          client.focus();
+          if ('navigate' in client) {
+            try {
+              await client.navigate(target);
+            } catch {
+              /* navigation failed — client is focused regardless */
+            }
+          }
+          return;
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target);
+    })()
+  );
 });

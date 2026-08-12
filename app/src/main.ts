@@ -15,6 +15,8 @@ import { renderArtist } from './views/artist';
 import { renderPrint } from './views/print';
 import { renderChat } from './views/chat';
 import { chatStart, onUnread, onIncoming, unlockAudio, playChatSound } from './chat';
+import { favoritesStart } from './favorites';
+import { startReminderScheduler } from './reminders';
 
 let appRoot: HTMLElement;
 let mainEl: HTMLElement;
@@ -326,6 +328,8 @@ async function boot() {
   maybeIosHint();
   maybePromptName();
   wireChatNotifications();
+  startReminderScheduler();
+  favoritesStart();
   unlockAudioOnGesture();
   void offline.init();
 

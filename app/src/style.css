@@ -490,6 +490,290 @@ button[hidden] {
   100% { transform: scale(1); }
 }
 
+/* Reminder bell (same shape as the heart, gold when on) */
+.sch-btn.rem:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.sch-btn.rem.rem-on {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: #fff;
+  animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-theme='dark'] .sch-btn.rem.rem-on {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+/* Reminder lead-time picker sheet */
+.rem-sheet__current {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(217, 169, 58, 0.12);
+  border: 1px solid rgba(217, 169, 58, 0.4);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rem-sheet__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rem-sheet__opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font: 600 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rem-sheet__opt.on {
+  border-color: var(--accent-2);
+  background: rgba(217, 169, 58, 0.1);
+}
+
+.rem-sheet__check {
+  color: var(--accent-2);
+}
+
+.rem-sheet__remove {
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px solid rgba(192, 57, 43, 0.4);
+  border-radius: 14px;
+  background: none;
+  color: var(--danger);
+  font: 650 13.5px var(--font-body);
+  cursor: pointer;
+}
+
+.rem-sheet__note {
+  margin-top: 14px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* "Next up" banner on My Day */
+.myday-nextup {
+  margin: 0 16px 12px;
+}
+
+.myday-nextup__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(217, 169, 58, 0.45);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(217, 169, 58, 0.14), rgba(232, 96, 47, 0.1));
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.myday-nextup__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-2);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.myday-nextup__name {
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.myday-nextup__meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.myday-row__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ============ Shared picks (My Day → "Who's going where") ============ */
+
+.fav-status {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 16px 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fav-status.show {
+  display: inline-flex;
+}
+
+.fav-status.synced {
+  color: var(--green);
+  border-color: rgba(47, 107, 79, 0.4);
+  background: rgba(47, 107, 79, 0.08);
+}
+
+.fav-status.offline,
+.fav-status.name-needed {
+  color: var(--muted);
+}
+
+.fav-status.error {
+  color: var(--danger);
+  border-color: rgba(192, 57, 43, 0.4);
+}
+
+.fav {
+  margin: 18px 16px 0;
+}
+
+.fav.hidden {
+  display: none;
+}
+
+.fav__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.fav__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.fav__title .icon {
+  color: var(--accent);
+}
+
+.fav__sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.fav__list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.fav__empty {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 14px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+}
+
+.fav-person {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.fav-person__avatar {
+  grid-row: 1 / span 2;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(158deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.fav-person__name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.fav-person__count {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.fav-person__chips {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fav-chip {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font: 600 11.5px var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.fav-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fav-chip--more {
+  color: var(--muted);
+  cursor: default;
+}
+
+.fav-chip--stale {
+  color: var(--muted);
+  cursor: default;
+}
+
 /* ============ Hero ============ */
 
 .hero {

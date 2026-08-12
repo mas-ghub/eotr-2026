@@ -2,7 +2,7 @@ import { loadData, stageColor } from '../data';
 import { navigate } from '../router';
 import { h, sheet, icon } from '../ui';
 import { schedule } from '../store';
-import { scheduleButton } from './common';
+import { scheduleButton, reminderControl } from './common';
 import { weatherStrip } from '../weather';
 import { onViewCleanup } from '../lifecycle';
 import type { Act } from '../types';
@@ -76,7 +76,7 @@ function buildAct(act: Act): HTMLElement {
     );
     const footer = act.placeholder
       ? h('p', { class: 'act-sheet__footer-note' }, 'This slot is not added to My Day.')
-      : h('div', { class: 'act-sheet__actions' }, scheduleButton(act));
+      : h('div', { class: 'act-sheet__actions' }, scheduleButton(act), reminderControl(act));
     sheet({ title: act.name, body, footer });
   });
 

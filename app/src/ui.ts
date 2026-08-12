@@ -79,7 +79,9 @@ const ICONS: Record<string, string> = {
   chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/>',
   send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-  offline: '<path d="M5 12.6a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M2 9.5a15 15 0 0 1 20 0M12 20h.01"/>'
+  offline: '<path d="M5 12.6a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M2 9.5a15 15 0 0 1 20 0M12 20h.01"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  bellFill: '<path fill="currentColor" stroke="none" d="M12 22a2.98 2.98 0 0 0 2.83-2h-5.66A2.98 2.98 0 0 0 12 22zm7-8v-6a7 7 0 0 0-4-6.3V1a1 1 0 1 0-2 0v.7A7 7 0 0 0 9 8v6l-2 3h10l-2-3z"/>'
 };
 
 export function icon(name: string, size = 20): string {

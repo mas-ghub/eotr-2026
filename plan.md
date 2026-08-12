@@ -1,17 +1,26 @@
 # End of the Road 2026 PWA — Handoff Plan
 
-_Written end of day 2026-08-10. Updated 2026-08-11 (dark mode + timetable + chat + DMs/groups). Say "look at plan.md and let's continue" to resume._
+_Written end of day 2026-08-10. Updated 2026-08-11 (dark mode + timetable + chat + DMs/groups + map added then REMOVED + reminders IN PROGRESS). Say "look at plan.md and let's continue" to resume._
 
 ---
 
-## 1. Where we are (all done, tested, LIVE)
+## 0. ⏸ CURRENT STATUS — resume here
 
-Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.14.0**, repo `mas-ghub/eotr-2026` (public).
+**Set reminders + shared "My Day" picks are BUILT, TESTED (9/9 suites) and ready to deploy.** SW bumped to **`eotr2026-v1.17.0`**.
+
+- **Set reminders** — `reminder-check.mjs` **10/10**. Fixed: fired reminders could no longer be removed (sheet now keys off any stored entry); `setReminder` no longer duplicates.
+- **Shared "My Day" picks** (`app/src/favorites.ts`) — when online, your saved sets auto-sync to Firestore `favorites/{uid}` (name + set ids). My Day shows a "Who's going where" live list of everyone else's picks. Strictly online-only + offline-hardened: an 8 s write watchdog + 30 s retry handle Firestore's silent offline buffering; chat/favorites share one deduped Firebase init. **Rules published 2026-08-12.**
+- **NEXT STEP:** `npm run build`, deploy `npx --yes gh-pages -d app/dist`, poll until live (`curl -s "…/sw.js" | grep CACHE_VERSION` → `v1.17.0`). Then test on a real phone (installed PWA): set a reminder ~30 min ahead + background the app; confirm two phones see each other's picks on My Day.
+
+---
+
+## 1. Where we are (done, tested, LIVE)
+
+Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.16.0**, repo `mas-ghub/eotr-2026` (public).
 
 **Working, verified, deployed:**
 
 - Lineup, Timetable (with fixed 09:00→02:00 hour labels), My Day schedule + clash flags, artist pages, film/Cinema, print views.
-- **Find Your Friends map (new)** — a 5th **Map** tab: Leaflet map showing everyone who's opted in to **location sharing**, plus a **"who's online"** chip strip from automatic presence heartbeats. Tap an online name or a map marker → jumps straight into a **DM**. Sharing is strictly opt-in (browser permission), stops on demand (deletes your pin), and the privacy note is right there. Presence stays while you browse; location fades after 30 min.
 - **Chat — public wall + private DMs + groups** ✅ Firebase connected (project `eotr-2026-chat`, Firestore Standard, `europe-west2`). Anonymous sign-in enabled. The **Everyone** wall (public guestbook) plus **private 1:1 DMs** and **group chats** up to 20 people. New messages pop up app-wide with a chime + toast + green badge. Private messages never appear on the public wall.
   - Tap **any name** on the wall to start a DM. **New chat** button opens a picker (pick 1 = DM, pick 2+ = group, with a group name). "Chats" tab lists conversations with unread dots + previews.
   - **Unique names enforced**: first come, first served via a Firestore `names` collection. Trying a name that's taken shows "X is already taken — try another ✨" and blocks it. Graceful fallback offline.
@@ -25,8 +34,9 @@ Live at **https://mas-ghub.github.io/eotr-2026/** — SW **v1.14.0**, repo `mas-
 - Header: offline pill + dark toggle + "?" help sheet. Install button Android-only.
 - Audio player: 5-bar equalizer, progress bar + timer, single-track exclusivity.
 - Festival-fun: weather strip, countdown, "See them live" (Songkick), "Surprise me", version footer.
+- **Map tab REMOVED** (v1.16.0) — Leaflet/location never rendered reliably on iOS/Android; deleted. See §0.
 
-**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke **23/23** · feature **7/7** · greeting **9/9** · chat-check **9/9** · **DM e2e 10/10** (local + live) · **group e2e 7/7** · **unique-name 6/6** (local + live) · **map-check 10/10** · **map-e2e 8/8** (local + live) · zero console errors.
+**Verification baseline:** `tsc --noEmit` clean · `vite build` clean · smoke **23/23** · feature **7/7** · greeting **9/9** · chat-check **9/9** · **DM e2e 10/10** · **group e2e 7/7** · **unique-name 6/6** · **reminder 10/10** · **favorites e2e 9/9** · zero console errors. All local e2e runs isolated behind the `devtest_` collection prefix (see §5).
 
 ---
 
@@ -40,6 +50,8 @@ node test/smoke.mjs         # run smoke suite (needs preview running on :4173 fi
 node test/feature-check.mjs # dark mode + timetable day persistence (also needs :4173)
 node test/greeting-check.mjs # name greeting prompt/pill (also needs :4173)
 node test/chat-check.mjs    # chat tab/view + not-configured state (also needs :4173)
+node test/reminder-check.mjs # set reminders UI flow (also needs :4173)
+node test/favorites-e2e.mjs  # shared "My Day" picks, two devices (needs :4173 + rules published)
 node app/scripts/verify-chat.mjs # validates Firebase keys in app/.env once set up
 npm --prefix scraper run clips -- --films   # full re-scrape incl. film trailers (needs ffmpeg + yt-dlp)
 node scraper/src/rebundle-one.mjs <slug>    # re-bundle one artist's audio (after adding an override)
@@ -77,10 +89,13 @@ Keys in `app/.env` (gitignored). `verify-chat.mjs` → **PASS**. Verified live.
 
 ### Backlog (not started)
 
-- **Set reminders** — notification before a saved set starts (needs opt-in; iOS web notifications only on installed PWAs — flaky, test carefully).
+- **Set reminders (IN PROGRESS, see §0)** — notification before a saved set starts. Local scheduler + SW notification; works while app is open/backgrounded; Notification Triggers on Android Chrome even when closed. iOS limitation (timers suspended when fully closed) documented.
+- **Festival Bingo / "I was there" tracker** — tick off artists as you see them → badges, progress, BINGO shout to the wall.
+- **Essential info cards** — water refill, first aid, phone charging, quiet camping, toilets (facts, not a map).
+- **Official announcements broadcast** — admin posts via the existing chat infra; everyone gets a chime/push.
+- **Lost & found board** + **Lift/carpool board** — filtered wall variants.
 - **Personal notes** on artists/sets (localStorage).
 - **Chat hardening**: Firebase App Check (reCAPTCHA) to block spam/bots, moderation/delete path, per-user rate limit via Cloud Functions. (Unique names are DONE — see §1.)
-- **Map privacy**: location data is opt-in and self-deleting; if wanted, add a "clear my history" or a friends-only (allowlist) mode. Also note iOS is stricter about background location.
 - Consider **auto-deploy GitHub Action** (push to main → build → deploy to gh-pages) so future updates are one `git push`.
 - When we're closer (within ~16 days): weather strip switches to live forecast automatically — no action needed. Set times will change → re-run scraper + deploy.
 
@@ -96,10 +111,9 @@ Keys in `app/.env` (gitignored). `verify-chat.mjs` → **PASS**. Verified live.
 
 ---
 
-## 6. First thing tomorrow if resuming
+## 6. First thing when resuming
 
-1. `git status` should be clean. Confirm live SW is v1.14.0.
-2. Run `npm run dev`, spot-check: chat (wall + Chats list + a DM from a name tap + a group), greeting prompt on fresh profile (try taking an existing name → rejected), dark toggle, timetable day persistence, and the **Map** tab (share location, see yourself + who's online, tap a name → DM).
-3. Try the map from two phones: both share location → each sees the other's pin + online chip; tap to DM.
-3. Try DMs/groups from two phones (or phone + incognito): tap a name on the wall → DM, send → it lands on the other phone with chime + badge.
-4. Then pick from the backlog: set reminders, personal notes, or chat hardening (name uniqueness / spam protection / moderation).
+**Both features are built, tested and ready to deploy (see §0).**
+1. `npm run build`, deploy `npx --yes gh-pages -d app/dist`, poll until live (`curl -s "…/sw.js" | grep CACHE_VERSION` → `v1.17.0`).
+2. Test on a real phone (installed PWA): set a reminder ~30 min ahead + background the app; confirm two phones see each other's picks on My Day.
+3. Then pick from the backlog: festival bingo, essential-info cards, official announcements broadcast, lost & found, or chat hardening (App Check / moderation).

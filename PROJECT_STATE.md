@@ -1,6 +1,6 @@
 # End of the Road 2026 PWA — Project State
 
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-12 (set reminders + shared "My Day" picks built & tested 9/9, ready to deploy — see §17–18, plan.md §0)_
 
 Unofficial fan project for **End of the Road 2026** (Larmer Tree Gardens, 3–6 Sept 2026).
 Offline-first PWA: lineup, clashfinder-style timetable, "My Day" schedule, print, and
@@ -22,8 +22,8 @@ offline 20s audio previews per artist.
 | `src/greeting.ts` | Name greeting: first-launch welcome prompt, time-of-day hero pill, localStorage name |
 | `src/chat.ts` | Firebase chat engine: lazy Firestore init (code-split), anonymous auth, realtime wall + conversations, DMs/groups, unread badge, Web Audio chime |
 | `src/views/chat.ts` | `#/chat` view: Everyone wall + Chats list + conversation threads, composer ("Posting as …"), tap-name-to-DM, New chat picker, status pill |
-| `src/location.ts` | Presence heartbeats ("who's online") + opt-in geolocation sharing (`locations` collection), Leaflet map data source |
-| `src/views/map.ts` | `#/map` view: Leaflet map with per-uid markers, online chip strip, share toggle + privacy note, tap-to-DM |
+| `src/reminders.ts` | Set reminders: local store, lead-time picker, scheduler, SW notifications (tested, ready to ship) |
+| `src/favorites.ts` | Shared "My Day" picks: auto-sync saved sets to Firestore when online, live list of everyone else's picks |
 | `src/audio.ts` | Audio player, offline clip store (IndexedDB), MediaRecorder clip extractor |
 | `src/types.ts` | Shared types (`Artist`, `Act`, `PreviewTrack`, `SocialLink`, …) |
 | `src/ui.ts` / `src/lifecycle.ts` | `h()` DOM helper, icons, toasts, view cleanup |
@@ -459,10 +459,70 @@ All additive — no existing layout/behavior changed, nothing can break if a sou
   caches made local tests look like app bugs — tests now unregister + clear caches.)
 - **Privacy stance**: presence is automatic while the app is open; location is always opt-in and
   self-deleting; locations older than 30 min are hidden. Users can stop any time.
-- **Status**: SW bumped to `eotr2026-v1.14.0`. New suites `test/map-check.mjs` **10/10** (UI +
-  geolocation override) and `test/map-e2e.mjs` **8/8** (two-device: both share → see each other's
-  pin + chip → tap-to-DM → stop sharing keeps presence) plus `test/map-e2e-live.mjs` **8/8**
-  (deployed site). Full regression green. Deployed to GitHub Pages.
+- **REMOVED (v1.16.0)**: the map never rendered reliably on real iOS/Android devices (partial
+  tiles, blank canvas) despite multiple sizing fixes, so the whole feature was deleted — tab,
+  `#/map` route, `src/views/map.ts`, `src/location.ts`, Leaflet dep, map CSS/icons, and the
+  map test suites. The isolated-test `devtest_*` rule mirrors remain in `firestore.rules`
+  (harmless, and still used by the chat e2e suites).
+
+## 17. Set reminders — TESTED, READY TO SHIP (2026-08-12, not yet deployed)
+
+- **`src/reminders.ts`** (new): local-only reminder store (`eotr2026.reminders.v1`),
+  lead-time options (showtime / 15 / 30 / 60 min), 15 s in-page scheduler (`schedulerTick`),
+  notification via `reg.showNotification` with plain-`Notification` fallback and an optional
+  Notification-Triggers hand-off (Chrome Android fires even when the app is closed). Permission
+  flow (`notificationState` / `requestNotificationPermission`).
+- **UI**: gold bell control `reminderControl(act)` (new in `views/common.ts`) wired into the
+  timetable act-sheet, artist set-rows, and My Day rows; a "Next up" banner on My Day
+  (`views/schedule.ts`) counting down to the next saved set.
+- **`sw.js`**: added a `notificationclick` handler (focus + navigate to the artist page).
+- **`data.ts`**: new `festivalStartMs(act)` — acts.json `startMs` is ms-since-midnight, so this
+  combines it with `dayKey` (+01:00 BST) into an absolute epoch. Reminders and My Day "next up"
+  use it; the timetable's `% 86400000` layout math is unaffected.
+- **Two fixes from the first full run** (2026-08-12):
+  1. A reminder that had **already fired** left a stale entry that the sheet could not remove
+     (`getReminder()` filters out fired). `views/common.ts` now shows "Remove reminder" whenever
+     *any* stored reminder exists for the act (active or fired).
+  2. `setReminder()` could **duplicate** an entry for the same act; it now replaces any earlier
+     entry instead of appending.
+- **Status**: `tsc` clean, `vite build` clean, `test/reminder-check.mjs` **10/10**. SW bumped to
+  `eotr2026-v1.17.0` (uncommitted). See `plan.md` §0 — deploy once the full suite is green.
+
+## 18. Shared "My Day" picks — "Who's going where" (2026-08-12, pending deploy)
+
+- **User request**: when the app is online, add the user's saved "My Day" sets to Firestore so
+  anyone can see what the group is into and planning to see. Decided: **auto-share when online**
+  (no toggle), surfaced on the **My Day page**. Always offline-safe — the app must never crash or
+  block on connection state.
+- **`src/favorites.ts`** (new): reuses the chat module's Firebase bootstrap
+  (`initFirestore`/`ensureAuth` exported from `src/chat.ts`, so one app + one anonymous identity).
+  - Writes `favorites/{uid}` = `{ name, actIds[], ts }` (max 200 sets) whenever the schedule
+    changes, **debounced 1.2 s**. Empty list → the doc is **deleted** (never stores a stale
+    "0 sets" row). Skips silently when Firebase is unconfigured, offline, no name yet
+    (`name-needed`), or on any write error — the local schedule is untouched.
+  - Live-subscribes to everyone else's docs (`onSnapshot`, excludes self) and exposes them sorted
+    by count desc. Online-only: offline the section just shows a gentle note.
+  - Status machine `off | offline | connecting | name-needed | synced | error` drives a small
+    pill on My Day ("Sharing my picks · live" / "Picks will share when you're back online" / …).
+  - **Offline hardening** (found + fixed during e2e): Firestore buffers writes silently while
+    disconnected (`setDoc` never settles), so the pill could sit on "Connecting…" forever.
+    `pushMyFavorites()` now races the write against an 8 s **watchdog** — on timeout it shows the
+    graceful offline pill. A 30 s periodic retry self-heals brief connection blips. Also
+    deduped concurrent `initFirestore()`/`ensureAuth()` (chat + favorites race at boot; the
+    second `initializeApp` would throw) and made `ensureAuth` retryable after a failure.
+- **`views/schedule.ts`**: `fav-status` pill under the My Day header + a **"Who's going where"**
+  section (avatar initial, name, set count, tappable set chips → artist page). Cleaned up on view
+  exit via `onViewCleanup`.
+- **`firestore.rules`**: new `favorites/{uid}` + `devtest_favorites` mirror — read by any signed-in
+  visitor, write/delete only the owning device; name/actIds/ts validated. **Published 2026-08-12**
+  (an earlier draft with a `actIds.all(...)` lambda + `count` field failed to parse in the console;
+  simplified to proven patterns — the UI derives the count from the list itself).
+- **`test/favorites-e2e.mjs`** (new, **9 checks**): two devices — A auto-shares 2 picks, B sees
+  A's name + count + set chips; A goes offline (graceful "share later" pill, no crash), re-syncs
+  online; A clears My Day → A vanishes from B's list. Added to `test/run-local.mjs`.
+- **Status**: **full suite 9/9** (smoke 23/23, feature 7/7, greeting 9/9, chat-check 9/9,
+  chat-e2e 10/10, group 7/7, unique-name 6/6, reminder 10/10, favorites 9/9). SW
+  `eotr2026-v1.17.0`. Not deployed. See `plan.md` §0.
 
 - Set times live in **static JSON built by the scraper** (`scraper/src/clashfinder.mjs` pulls from
   Clashfinder). They are NOT fetched live by the PWA.

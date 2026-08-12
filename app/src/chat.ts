@@ -83,6 +83,8 @@ let db: Firestore | null = null;
 let auth: Auth | null = null;
 let myUid: string | null = null;
 let authState: AuthState = 'unknown';
+let initPromise: Promise<Firestore | null> | null = null;
+let authPromise: Promise<string | null> | null = null;
 let unsubWall: (() => void) | null = null;
 let unsubConvs: (() => void) | null = null;
 let started = false;
@@ -132,47 +134,60 @@ function emitIncoming(n: IncomingNotice) {
 // Firebase bootstrap (lazy, code-split)
 // ====================================================================
 
-async function initFirestore(): Promise<Firestore | null> {
+/** Lazy-initialise Firestore (single app-wide instance). Exported so the
+ *  favorites-sharing module can reuse the same connection + identity. */
+export async function initFirestore(): Promise<Firestore | null> {
   if (db) return db;
-  const cfg = chatConfig();
-  if (!cfg) return null;
-  try {
-    const { initializeApp } = await import('firebase/app');
-    app = initializeApp(cfg);
-    const { getFirestore } = await import('firebase/firestore');
-    db = getFirestore(app);
-    return db;
-  } catch (err) {
-    setStatus({ state: 'error', message: err instanceof Error ? err.message : 'Could not connect' });
-    return null;
-  }
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    const cfg = chatConfig();
+    if (!cfg) return null;
+    try {
+      const { initializeApp } = await import('firebase/app');
+      app = initializeApp(cfg);
+      const { getFirestore } = await import('firebase/firestore');
+      db = getFirestore(app);
+      return db;
+    } catch (err) {
+      setStatus({ state: 'error', message: err instanceof Error ? err.message : 'Could not connect' });
+      return null;
+    }
+  })();
+  return initPromise;
 }
 
-/** Restore or create the anonymous identity (same uid persists across reloads). */
-async function ensureAuth(): Promise<string | null> {
+/** Restore or create the anonymous identity (same uid persists across reloads).
+ *  Exported so favorites sharing can reuse the same identity. */
+export async function ensureAuth(): Promise<string | null> {
   if (myUid) return myUid;
   if (!app) return null;
-  try {
-    const { getAuth, onAuthStateChanged, signInAnonymously } = await import('firebase/auth');
-    auth = getAuth(app);
-    await new Promise<void>((resolve) => {
-      const un = onAuthStateChanged(auth!, () => {
-        un();
-        resolve();
+  if (authPromise) return authPromise;
+  authPromise = (async () => {
+    try {
+      const { getAuth, onAuthStateChanged, signInAnonymously } = await import('firebase/auth');
+      auth = getAuth(app);
+      await new Promise<void>((resolve) => {
+        const un = onAuthStateChanged(auth!, () => {
+          un();
+          resolve();
+        });
       });
-    });
-    let user: User | null = auth.currentUser;
-    if (!user) {
-      const cred = await signInAnonymously(auth);
-      user = cred.user;
+      let user: User | null = auth.currentUser;
+      if (!user) {
+        const cred = await signInAnonymously(auth);
+        user = cred.user;
+      }
+      myUid = user.uid;
+      setAuthState('ready');
+      return myUid;
+    } catch (err) {
+      // Reset so a later retry (e.g. after reconnecting) can try again.
+      authPromise = null;
+      setAuthState('failed');
+      return null;
     }
-    myUid = user.uid;
-    setAuthState('ready');
-    return myUid;
-  } catch (err) {
-    setAuthState('failed');
-    return null;
-  }
+  })();
+  return authPromise;
 }
 
 function toMillis(v: unknown): number {

@@ -1,8 +1,17 @@
-import { loadData } from '../data';
+import { loadData, festivalStartMs } from '../data';
 import { navigate } from '../router';
 import { h, icon } from '../ui';
 import { schedule } from '../store';
 import { weatherStrip } from '../weather';
+import { scheduleButton, reminderControl } from './common';
+import {
+  favoritesSync,
+  syncLabel,
+  onSharedFavorites,
+  onFavoritesSync,
+  sharedFavorites,
+  type FavoritesSync
+} from '../favorites';
 import { onViewCleanup } from '../lifecycle';
 import type { Act } from '../types';
 
@@ -73,10 +82,136 @@ export async function renderSchedule(): Promise<HTMLElement> {
   );
   root.appendChild(head);
 
-  root.appendChild(weatherStrip(meta.days));
+  const weatherEl = weatherStrip(meta.days);
+  root.appendChild(weatherEl);
+
+  const favStatus = h('p', { class: 'fav-status' });
+  root.insertBefore(favStatus, weatherEl);
 
   const body = h('div', { class: 'myday-body' });
   root.appendChild(body);
+
+  const nextUp = h('div', { class: 'myday-nextup' });
+  root.insertBefore(nextUp, body);
+
+  // ---- Shared-picks status pill + "Who's going where" ----
+  const actById = new Map(acts.map((a) => [a.id, a]));
+
+  const paintFavStatus = (s: FavoritesSync) => {
+    const label = syncLabel();
+    if (!label) {
+      favStatus.textContent = '';
+      favStatus.classList.remove('show');
+      return;
+    }
+    favStatus.textContent = label;
+    favStatus.classList.toggle('show', true);
+    favStatus.classList.toggle('synced', s === 'synced');
+    favStatus.classList.toggle('offline', s === 'offline');
+    favStatus.classList.toggle('name-needed', s === 'name-needed');
+    favStatus.classList.toggle('error', s === 'error');
+  };
+
+  const favSection = h(
+    'section',
+    { class: 'fav' },
+    h(
+      'header',
+      { class: 'fav__head' },
+      h('h3', { class: 'fav__title', html: `${icon('heart', 15)} Who’s going where` }),
+      h('p', { class: 'fav__sub' }, 'Everyone’s My Day picks — shared live from their phones while they’re online.')
+    ),
+    h('div', { class: 'fav__list' })
+  );
+
+  const paintFavs = () => {
+    const st = favoritesSync();
+    favSection.classList.toggle('hidden', st === 'off');
+    if (st === 'off') return;
+    const listEl = favSection.querySelector('.fav__list')!;
+    const list = sharedFavorites();
+    listEl.innerHTML = '';
+    if (!list.length) {
+      listEl.appendChild(
+        h(
+          'p',
+          { class: 'fav__empty' },
+          st === 'offline'
+            ? 'Offline — picks will appear here when you’re back online.'
+            : 'No one else is sharing picks yet — save some sets and they’ll show up here.'
+        )
+      );
+      return;
+    }
+    for (const p of list) {
+      const chips = p.actIds.slice(0, 6).map((id) => {
+        const act = actById.get(id);
+        return act
+          ? h(
+              'button',
+              { class: 'fav-chip', type: 'button', onclick: () => act.artistSlug && navigate(`#/artist/${act.artistSlug}`) },
+              `${act.name} · ${act.stage}`
+            )
+          : h('span', { class: 'fav-chip fav-chip--stale' }, '—');
+      });
+      if (p.actIds.length > 6) chips.push(h('span', { class: 'fav-chip fav-chip--more' }, `+${p.actIds.length - 6} more`));
+      listEl.appendChild(
+        h(
+          'div',
+          { class: 'fav-person' },
+          h('span', { class: 'fav-person__avatar' }, p.name.charAt(0).toUpperCase()),
+          h(
+            'div',
+            { class: 'fav-person__main' },
+            h('p', { class: 'fav-person__name' }, p.name),
+            h('p', { class: 'fav-person__count' }, `${p.actIds.length} set${p.actIds.length === 1 ? '' : 's'}`)
+          ),
+          h('div', { class: 'fav-person__chips' }, ...chips)
+        )
+      );
+    }
+  };
+
+  const unFavList = onSharedFavorites(() => paintFavs());
+  const unFavSync = onFavoritesSync((s) => {
+    paintFavStatus(s);
+    paintFavs();
+  });
+  onViewCleanup(() => {
+    unFavList();
+    unFavSync();
+  });
+  paintFavStatus(favoritesSync());
+  root.appendChild(favSection);
+
+  const paintNextUp = () => {
+    const now = Date.now();
+    const upcoming = [...schedule.resolved(acts).values()]
+      .flat()
+      .filter((a: Act) => festivalStartMs(a) > now)
+      .sort((a: Act, b: Act) => festivalStartMs(a) - festivalStartMs(b))[0];
+    if (!upcoming) {
+      nextUp.innerHTML = '';
+      return;
+    }
+    const mins = Math.max(0, Math.round((festivalStartMs(upcoming) - now) / 60000));
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    const when = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
+    nextUp.innerHTML = '';
+    nextUp.appendChild(
+      h(
+        'button',
+        { class: 'myday-nextup__btn', type: 'button', onclick: () => upcoming.artistSlug && navigate(`#/artist/${upcoming.artistSlug}`) },
+        h('span', { class: 'myday-nextup__label', html: `${icon('clock', 14)} Next up` }),
+        h('span', { class: 'myday-nextup__name' }, upcoming.name),
+        h('span', { class: 'myday-nextup__meta' }, `${upcoming.stage} · in ${when}`)
+      )
+    );
+  };
+  paintNextUp();
+  const nextTimer = setInterval(paintNextUp, 30000);
+  onViewCleanup(() => clearInterval(nextTimer));
 
   const render = () => {
     const grouped = schedule.resolved(acts);
@@ -129,10 +264,17 @@ export async function renderSchedule(): Promise<HTMLElement> {
             h('p', { class: 'myday-row__name' }, act.name),
             h('p', { class: 'myday-row__meta' }, h('span', { class: 'myday-row__stage' }, act.stage), clash ? h('span', { class: 'clash-tag', html: `${icon('alert', 12)} clashes with another set` }) : null)
           ),
-          h('button', { class: 'icon-btn remove', type: 'button', 'aria-label': `Remove ${act.name}`, html: icon('trash', 17) })
+          h(
+            'div',
+            { class: 'myday-row__actions' },
+            reminderControl(act),
+            scheduleButton(act, render),
+            h('button', { class: 'icon-btn remove', type: 'button', 'aria-label': `Remove ${act.name}`, html: icon('trash', 17) })
+          )
         );
         row.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).closest('.remove')) return;
+          const target = e.target as HTMLElement;
+          if (target.closest('.remove') || target.closest('.sch-btn') || target.closest('.myday-row__actions')) return;
           if (act.artistSlug) navigate(`#/artist/${act.artistSlug}`);
         });
         row.querySelector('.remove')!.addEventListener('click', () => schedule.remove(act.id));
@@ -146,6 +288,7 @@ export async function renderSchedule(): Promise<HTMLElement> {
         h('div', { class: 'empty' }, h('div', { class: 'empty__icon', html: icon('heart', 34) }), h('h3', {}, 'Nothing on this day yet'))
       );
     }
+    paintNextUp();
   };
 
   head.querySelector('.myday-actions button:first-child')!.addEventListener('click', () => navigate('#/print/schedule'));
