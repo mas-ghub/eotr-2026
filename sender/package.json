@@ -1,0 +1,11 @@
+{
+  "name": "eotr-push-sender",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.2.0"
+  }
+}

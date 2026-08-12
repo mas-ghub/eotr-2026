@@ -134,6 +134,12 @@ function emitIncoming(n: IncomingNotice) {
 // Firebase bootstrap (lazy, code-split)
 // ====================================================================
 
+/** Returns the shared Firebase app instance (after initFirestore ran), or null.
+ *  Exported so push messaging can obtain it for getMessaging(app). */
+export function getApp(): FirebaseApp | null {
+  return app;
+}
+
 /** Lazy-initialise Firestore (single app-wide instance). Exported so the
  *  favorites-sharing module can reuse the same connection + identity. */
 export async function initFirestore(): Promise<Firestore | null> {
@@ -160,8 +166,7 @@ export async function initFirestore(): Promise<Firestore | null> {
  *  Exported so favorites sharing can reuse the same identity. */
 export async function ensureAuth(): Promise<string | null> {
   if (myUid) return myUid;
-  if (!app) return null;
-  if (authPromise) return authPromise;
+  if (!app) return null;  if (authPromise) return authPromise;
   authPromise = (async () => {
     try {
       const { getAuth, onAuthStateChanged, signInAnonymously } = await import('firebase/auth');
