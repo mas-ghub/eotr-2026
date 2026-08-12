@@ -3,7 +3,7 @@ import { navigate } from '../router';
 import { h, icon } from '../ui';
 import { schedule } from '../store';
 import { weatherStrip } from '../weather';
-import { scheduleButton, reminderControl } from './common';
+import { reminderControl } from './common';
 import {
   favoritesSync,
   syncLabel,
@@ -268,13 +268,12 @@ export async function renderSchedule(): Promise<HTMLElement> {
             'div',
             { class: 'myday-row__actions' },
             reminderControl(act),
-            scheduleButton(act, render),
             h('button', { class: 'icon-btn remove', type: 'button', 'aria-label': `Remove ${act.name}`, html: icon('trash', 17) })
           )
         );
         row.addEventListener('click', (e) => {
           const target = e.target as HTMLElement;
-          if (target.closest('.remove') || target.closest('.sch-btn') || target.closest('.myday-row__actions')) return;
+          if (target.closest('.remove') || target.closest('.myday-row__actions')) return;
           if (act.artistSlug) navigate(`#/artist/${act.artistSlug}`);
         });
         row.querySelector('.remove')!.addEventListener('click', () => schedule.remove(act.id));
