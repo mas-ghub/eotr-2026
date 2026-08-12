@@ -17,6 +17,7 @@ import { renderChat } from './views/chat';
 import { chatStart, onUnread, onIncoming, unlockAudio, playChatSound } from './chat';
 import { favoritesStart } from './favorites';
 import { startReminderScheduler } from './reminders';
+import { APP_VERSION, APP_BUILT } from './version';
 
 let appRoot: HTMLElement;
 let mainEl: HTMLElement;
@@ -189,9 +190,9 @@ function buildShell(updated: string) {
   const footer = h(
     'footer',
     { class: 'app-footer' },
-    h('p', {}, `Updated ${updated} · unofficial fan guide. Set times from Clashfinder; artists from the official End of the Road site.`),
+    h('p', {}, `Set times as of ${updated}. Unofficial fan guide — set times from Clashfinder; artists from the official End of the Road site.`),
     h('p', {}, 'Preview clips are 30-second excerpts for discovery purposes.'),
-    h('p', { class: 'app-footer__version' }, 'EOTR 2026 PWA · version 1.0.0')
+    h('p', { class: 'app-footer__version' }, `EOTR 2026 PWA · v${APP_VERSION} · updated ${APP_BUILT}`)
   );
 
   const tabs = h('nav', { class: 'app-nav' });
