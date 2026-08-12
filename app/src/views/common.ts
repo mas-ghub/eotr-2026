@@ -172,7 +172,7 @@ function openReminderSheet(act: Act, onDone: () => void) {
     test.addEventListener('click', async () => {
       const sent = await sendTestNotification();
       if (sent) {
-        toast('Test notification sent — check your notification shade.', { type: 'success', ms: 3000 });
+        toast('Test notification coming in ~1 min — leave the app, then tap it to open My Day.', { type: 'success', ms: 6000 });
       } else {
         toast('Notifications are blocked — allow them in your phone settings first.', { type: 'error', ms: 4600 });
       }

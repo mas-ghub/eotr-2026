@@ -218,15 +218,16 @@ function buildBody(act: Act): string {
 
 /** Show a system notification. Prefers the service worker (so it can open the
  *  app on tap); falls back to a plain Notification. */
-export async function showReminderNotification(r: Reminder): Promise<void> {
-  const title = `${r.name} starts in ${leadLabel(r.leadMin)}`;
-  const body = `${r.stage} · ${r.start}`;
+export async function showReminderNotification(r: Reminder, override?: { title?: string; body?: string; url?: string }): Promise<void> {
+  const title = override?.title ?? `${r.name} starts in ${leadLabel(r.leadMin)}`;
+  const body = override?.body ?? `${r.stage} · ${r.start}`;
+  const url = override?.url ?? (r.artistSlug ? `./#/artist/${r.artistSlug}` : './');
   const options: NotificationOptions = {
     body,
     tag: `rem-${r.actId}`,
     icon: './icons/icon-192.png',
     badge: './icons/icon-192.png',
-    data: { url: r.artistSlug ? `./#/artist/${r.artistSlug}` : './' }
+    data: { url }
   };
 
   try {
@@ -243,9 +244,8 @@ export async function showReminderNotification(r: Reminder): Promise<void> {
       const n = new Notification(title, options);
       n.onclick = () => {
         n.close();
-        const url = r.artistSlug ? `#/artist/${r.artistSlug}` : '#/lineup';
         window.focus();
-        location.hash = url;
+        location.hash = url.replace(/^\.\//, '') || '#/lineup';
       };
     }
   } catch {
@@ -262,26 +262,61 @@ function supportsTriggers(): boolean {
   }
 }
 
-/** Fire an instant test notification so the user can verify the whole chain
- *  (permission → service worker → notification → tap-to-open) works on their
- *  device. Returns true if the notification was actually shown. */
+/** Schedule a test notification ~1 minute from now so the user can leave the
+ *  app and verify it fires. On Chrome Android we hand it to the service worker
+ *  with a TimestampTrigger, so it pops even when the app is fully closed.
+ *  Elsewhere an in-app timer covers the open/backgrounded case. Tapping the
+ *  notification opens the app at My Day. Returns true if it was scheduled. */
 export async function sendTestNotification(): Promise<boolean> {
   try {
     let state = notificationState();
     if (state === 'default') state = await requestNotificationPermission();
     if (state !== 'granted') return false;
-    await showReminderNotification({
+
+    const title = 'EOTR test reminder';
+    const body = 'Tap to open My Day — notifications work ✅';
+    const url = './#/myday';
+    const fireAt = Date.now() + 60000; // 1 minute from now
+    const r: Reminder = {
       actId: 'test',
       name: 'Test reminder',
       stage: 'EOTR 2026',
       dayKey: '',
       start: 'now',
-      startMs: Date.now(),
+      startMs: fireAt,
       artistSlug: null,
       leadMin: 0,
-      fireAt: Date.now(),
-      fired: true
-    });
+      fireAt,
+      fired: false
+    };
+
+    // Preferred path: Notification Triggers → fires even when the app is closed.
+    if (supportsTriggers() && 'serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const Trigger = (window as unknown as { TimestampTrigger?: new (t: number) => unknown }).TimestampTrigger;
+        if (Trigger) {
+          const opts: NotificationOptions & Record<string, unknown> = {
+            body,
+            tag: 'rem-test',
+            icon: './icons/icon-192.png',
+            badge: './icons/icon-192.png',
+            data: { url },
+            showTrigger: new Trigger(fireAt)
+          };
+          await reg.showNotification(title, opts);
+          return true;
+        }
+      } catch {
+        /* fall back to the in-app timer below */
+      }
+    }
+
+    // Fallback: in-app timer. Fires while the app is open or backgrounded (on
+    // iOS a fully-closed app suspends timers, so keep it in the foreground).
+    window.setTimeout(() => {
+      void showReminderNotification(r, { title, body, url });
+    }, 60000);
     return true;
   } catch {
     return false;
