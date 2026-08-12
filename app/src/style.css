@@ -573,6 +573,26 @@ button[hidden] {
   color: var(--muted);
 }
 
+.rem-sheet__test {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: 600 12px var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.rem-sheet__test:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* "Next up" banner on My Day */
 .myday-nextup {
   margin: 0 16px 12px;

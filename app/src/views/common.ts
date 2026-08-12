@@ -7,6 +7,7 @@ import {
   allReminders,
   removeReminder,
   setReminder,
+  sendTestNotification,
   notificationState,
   requestNotificationPermission,
   type LeadOption
@@ -159,6 +160,25 @@ function openReminderSheet(act: Act, onDone: () => void) {
   body.appendChild(
     h('p', { class: 'rem-sheet__note' }, 'We’ll ping you just before the set starts. For this to work in your pocket, keep the app installed and notifications allowed.')
   );
+
+  // Dev-only test link (shows for Mark so he can verify notifications work on
+  // his phone without waiting for a real set in September).
+  const isOwner = (localStorage.getItem('eotr2026.name.v1') || '').trim().toLowerCase() === 'mark';
+  if (isOwner) {
+    const test = h(
+      'button',
+      { class: 'rem-sheet__test', type: 'button', html: `${icon('bell', 13)} Send test notification` }
+    );
+    test.addEventListener('click', async () => {
+      const sent = await sendTestNotification();
+      if (sent) {
+        toast('Test notification sent — check your notification shade.', { type: 'success', ms: 3000 });
+      } else {
+        toast('Notifications are blocked — allow them in your phone settings first.', { type: 'error', ms: 4600 });
+      }
+    });
+    body.appendChild(test);
+  }
 
   const closeSheet = sheet({ title: act.name, body }).close;
 }

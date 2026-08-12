@@ -261,3 +261,29 @@ function supportsTriggers(): boolean {
     return false;
   }
 }
+
+/** Fire an instant test notification so the user can verify the whole chain
+ *  (permission → service worker → notification → tap-to-open) works on their
+ *  device. Returns true if the notification was actually shown. */
+export async function sendTestNotification(): Promise<boolean> {
+  try {
+    let state = notificationState();
+    if (state === 'default') state = await requestNotificationPermission();
+    if (state !== 'granted') return false;
+    await showReminderNotification({
+      actId: 'test',
+      name: 'Test reminder',
+      stage: 'EOTR 2026',
+      dayKey: '',
+      start: 'now',
+      startMs: Date.now(),
+      artistSlug: null,
+      leadMin: 0,
+      fireAt: Date.now(),
+      fired: true
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
