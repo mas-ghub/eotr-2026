@@ -87,31 +87,9 @@ Firebase project `eotr-2026-chat` created by the user; Firestore **Standard edit
 Sign-in method → Anonymous); `firestore.rules` published (conversations + messages).
 Keys in `app/.env` (gitignored). `verify-chat.mjs` → **PASS**. Verified live.
 
-### Web Push reminders (BUILT — needs your Firebase + GitHub setup to activate)
-
-Reminders now also work on iOS when the app is **closed**, via Web Push (FCM).
-On-device `app/src/push.ts` syncs each device's upcoming reminders + a push token
-to a Firestore `pushReminders/{deviceId}` doc; `sender/push-sender.mjs` (GitHub
-Actions cron every 5 min, or manual **Run workflow**) reads due reminders and
-pushes them — the SW's new `push` handler displays them (same tag/tap-through).
-
-**To activate (2 steps, needs you):**
-1. **VAPID key** → Firebase console → Project settings → **Cloud Messaging** →
-   Web push certificates → copy the **Key pair** → add as `VITE_FIREBASE_VAPID_KEY=`
-   in `app/.env`, then `npm run build` + deploy (the app shows "Sharing…" only
-   after this; without it push silently stays off).
-2. **Service account** → Firebase console → Project settings → **Service accounts**
-   → Generate new private key → save the JSON → GitHub → repo **Settings → Secrets
-   and variables → Actions** → new secret `FIREBASE_SERVICE_ACCOUNT` = the JSON
-   contents. Then push the `.github/workflows/send-reminders.yml` + `sender/`
-   folder and the cron starts sending.
-
-Test: set a reminder, then GitHub → Actions → send-reminders → **Run workflow** to
-fire it immediately, or wait ≤5 min for the cron.
-
 ### Backlog (not started)
 
-- **Set reminders — DONE ✅** (SW v1.20.0). Local scheduler + SW notification, Notification Triggers on Android, and now **Web Push** (`sender/` + cron) so reminders fire even when the app is closed on iOS. See "Web Push reminders" above.
+- **Set reminders — DONE ✅** (SW v1.20.0). Notification before a saved set starts. Local scheduler + SW notification; works while app is open/backgrounded; Notification Triggers on Android Chrome even when closed. iOS: fires when the app is reopened (background timers are suspended when fully closed — a platform limitation, documented).
 - **Festival Bingo / "I was there" tracker** — tick off artists as you see them → badges, progress, BINGO shout to the wall.
 - **Essential info cards** — water refill, first aid, phone charging, quiet camping, toilets (facts, not a map).
 - **Official announcements broadcast** — admin posts via the existing chat infra; everyone gets a chime/push.

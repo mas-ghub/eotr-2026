@@ -107,24 +107,6 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Web-push reminder registrations — one doc per device (id = local device
-    // key). The device may only write its own doc (uid must match). The
-    // scheduled sender (scripts/push-sender.mjs, GitHub Actions cron) reads
-    // these with Admin SDK credentials (bypasses rules) and pushes via FCM.
-    match /pushReminders/{deviceId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow create, update: if request.auth != null
-        && request.auth.uid == request.resource.data.uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 24
-        && request.resource.data.token is string
-        && request.resource.data.token.size() <= 500
-        && request.resource.data.reminders is list
-        && request.resource.data.reminders.size() <= 100;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uid;
-    }
-
     // Conversations: only participants may read or create
     match /conversations/{convId} {
       // resource == null covers reading a doc that doesn't exist yet (e.g. when
@@ -222,20 +204,6 @@ service cloud.firestore {
         && request.resource.data.actIds.size() <= 200
         && request.resource.data.ts is timestamp;
       allow delete: if request.auth != null && request.auth.uid == uid;
-    }
-
-    match /devtest_pushReminders/{deviceId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow create, update: if request.auth != null
-        && request.auth.uid == request.resource.data.uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 24
-        && request.resource.data.token is string
-        && request.resource.data.token.size() <= 500
-        && request.resource.data.reminders is list
-        && request.resource.data.reminders.size() <= 100;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.uid;
     }
 
     match /devtest_conversations/{convId} {

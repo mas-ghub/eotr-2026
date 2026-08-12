@@ -134,12 +134,6 @@ function emitIncoming(n: IncomingNotice) {
 // Firebase bootstrap (lazy, code-split)
 // ====================================================================
 
-/** Returns the shared Firebase app instance (after initFirestore ran), or null.
- *  Exported so push messaging can obtain it for getMessaging(app). */
-export function getApp(): FirebaseApp | null {
-  return app;
-}
-
 /** Lazy-initialise Firestore (single app-wide instance). Exported so the
  *  favorites-sharing module can reuse the same connection + identity. */
 export async function initFirestore(): Promise<Firestore | null> {

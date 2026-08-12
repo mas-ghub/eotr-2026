@@ -16,7 +16,6 @@ import { renderPrint } from './views/print';
 import { renderChat } from './views/chat';
 import { chatStart, onUnread, onIncoming, unlockAudio, playChatSound } from './chat';
 import { favoritesStart } from './favorites';
-import { pushStart } from './push';
 import { startReminderScheduler } from './reminders';
 import { APP_VERSION, APP_BUILT } from './version';
 
@@ -332,7 +331,6 @@ async function boot() {
   wireChatNotifications();
   startReminderScheduler();
   favoritesStart();
-  pushStart();
   unlockAudioOnGesture();
   void offline.init();
 
