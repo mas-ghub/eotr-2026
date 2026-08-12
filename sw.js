@@ -2,7 +2,7 @@
  * Bump CACHE_VERSION whenever the app or the festival data changes so clients
  * download fresh copies.
  */
-const CACHE_VERSION = 'eotr2026-v1.21.0';
+const CACHE_VERSION = 'eotr2026-v1.22.0';
 const APP_CACHE = `app-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 // The page downloads all clips into this cache with progress UI, so offline
@@ -159,29 +159,5 @@ self.addEventListener('notificationclick', (event) => {
       }
       if (self.clients.openWindow) await self.clients.openWindow(target);
     })()
-  );
-});
-
-// Web push reminders arrive here (sent by the scheduled sender at fire time).
-// Display them exactly like the in-app ones, using the same URL for tap-through.
-self.addEventListener('push', (event) => {
-  let payload = {};
-  try {
-    payload = event.data ? event.data.json() : {};
-  } catch {
-    payload = {};
-  }
-  const title = payload.title || 'EOTR 2026 reminder';
-  const body = payload.body || '';
-  const tag = payload.tag || 'eotr-reminder';
-  const url = payload.url || './';
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag,
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png',
-      data: { url }
-    })
   );
 });
