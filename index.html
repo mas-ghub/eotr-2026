@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>End of the Road 2026 — Festival Guide</title>
+    <meta
+      name="description"
+      content="End of the Road 2026 lineup, stage times, personal timetable and 30-second music previews. Works offline."
+    />
+    <meta name="theme-color" content="#0e241c" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EOTR 2026" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="stylesheet" href="./fonts/fonts.css" />
+    <meta property="og:title" content="End of the Road 2026 — Festival Guide" />
+    <meta property="og:type" content="website" />
+    <style>
+      /* ── Sparky splash overlay: a full-screen iframe (./splash.html) that the
+             app shows on launch and dismisses on tap / Skip / auto after the
+             animation ends. Shown every launch, no reinstall needed. ── */
+      #sparky-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: #0b0f16;
+        transition: opacity .35s ease;
+      }
+      #sparky-splash.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #sparky-splash iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-C_YLww_u.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B8FzGe8t.css">
+  </head>
+  <body>
+    <div id="sparky-splash" aria-hidden="true">
+      <iframe id="sparky-frame" src="./splash.html" title="Sparky splash screen" tabindex="-1" scrolling="no"></iframe>
+    </div>
+    <div id="app"></div>
+    <div id="printRoot" aria-hidden="true"></div>
+    <script>
+      // Sparky splash: the iframe tells us when it is done (tap anywhere, Skip,
+      // or shortly after the animation reaches its end). A 32s fail-safe means
+      // the splash can never trap anyone — the app always becomes reachable.
+      (function () {
+        var el = document.getElementById('sparky-splash');
+        if (!el) return;
+        var done = false;
+        // On iOS, tapping the splash then dismissing it mid-gesture can let the
+        // browser re-target that tap's click to whatever is now underneath —
+        // the Skip button sits over the bottom-nav "My Day" tab, so it would
+        // navigate there. Swallow any click for a short window after dismissal
+        // so the splash can never change where the app lands.
+        var swallowUntil = 0;
+        function swallow(e) {
+          if (Date.now() < swallowUntil) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+        }
+        document.addEventListener('click', swallow, true);
+        document.addEventListener('auxclick', swallow, true);
+        function dismiss() {
+          if (done) return;
+          done = true;
+          swallowUntil = Date.now() + 800;
+          el.classList.add('gone');
+          setTimeout(function () {
+            if (el.parentNode) el.parentNode.removeChild(el);
+          }, 600);
+        }
+        window.addEventListener('message', function (e) {
+          if (e.data && e.data.type === 'sparky-skip') dismiss();
+        });
+        setTimeout(dismiss, 32000);
+      })();
+    </script>
+  </body>
+</html>
